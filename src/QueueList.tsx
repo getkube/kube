@@ -1,10 +1,12 @@
 import {useEffect,useRef,useState,useSyncExternalStore} from 'react';
-import {GripVertical,X} from 'lucide-react';
+import {GripVertical,X,MoreHorizontal} from 'lucide-react';
+import type {Track} from './model';
 import {useApp} from './context';
 import {Cover,IconButton} from './components';
 
-export function QueueList() {
+export function QueueList({onAdd}:{onAdd:(track:Track)=>void}) {
   const {player}=useApp();const state=useSyncExternalStore(player.subscribe,player.snapshot);
+  const [menu,setMenu]=useState<number|null>(null);
   const root=useRef<HTMLDivElement>(null);
   const drag=useRef<{from:number;to:number;y:number;start:number;active:boolean;scroll:HTMLElement;frame:number}|null>(null);
   const [marker,setMarker]=useState<number|null>(null),[announcement,announce]=useState('');
@@ -31,6 +33,7 @@ export function QueueList() {
       onPointerCancel={cancel} onLostPointerCapture={cancel}
       onKeyDown={event=>{const to=event.key==='ArrowUp'?index-1:event.key==='ArrowDown'?index+1:event.key==='Home'?state.index+1:event.key==='End'?state.queue.length-1:undefined;if(to!==undefined){event.preventDefault();if(to>state.index&&to<state.queue.length){player.reorder(index,to);announce(`Moved ${track.title} to position ${to+1}`);requestAnimationFrame(()=>root.current?.querySelectorAll<HTMLButtonElement>('.queue-grip')[to]?.focus());}}}}><GripVertical size={20}/></button>
     <button className="queue-song" aria-label={`Play queue song ${index+1}: ${track.title}`} aria-current={index===state.index?'true':undefined} onClick={()=>void player.play(track,state.queue)}><Cover track={track}/><span><strong>{track.title}</strong><small>{track.author}</small></span>{index===state.index&&<small className="queue-now">Now playing</small>}</button>
+    <div className="menu-wrap"><IconButton label={`Options for queued ${track.title}`} onClick={()=>setMenu(menu===index?null:index)}><MoreHorizontal size={19}/></IconButton>{menu===index&&<><button className="menu-dismiss" aria-label="Close queue options" onClick={()=>setMenu(null)}/><div className="track-menu" role="menu"><button role="menuitem" onClick={()=>{setMenu(null);onAdd(track);}}>Add to playlist</button></div></>}</div>
     <IconButton label={`Remove queue song ${index+1}`} disabled={index===state.index} onClick={()=>player.remove(index)}><X size={17}/></IconButton>
   </div>)}</div>;
 }

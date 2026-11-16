@@ -1,6 +1,9 @@
 package app.kube.music;
 
 import android.app.Activity;
+import android.animation.ValueAnimator;
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.net.Uri;
@@ -29,11 +32,23 @@ import org.json.JSONObject;
 public class KubePlayerPlugin extends Plugin {
     private ListenableFuture<MediaController> future;
     private MediaController controller;
+    private ValueAnimator fade;
+    private float desiredVolume = 1f;
+    private boolean fadeOnPlay;
+    private void cancelFade() { if (fade != null) { fade.removeAllListeners(); fade.cancel(); fade = null; } }
+    private void fadeTo(float target, boolean pauseAfter) {
+        cancelFade();
+        fade = ValueAnimator.ofFloat(controller.getVolume(), target);
+        fade.setDuration(250);
+        fade.addUpdateListener(value -> controller.setVolume((float)value.getAnimatedValue()));
+        fade.addListener(new AnimatorListenerAdapter() { @Override public void onAnimationEnd(Animator animation) { if (pauseAfter) { controller.pause(); controller.setVolume(desiredVolume); } fade = null; } });
+        fade.start();
+    }
     @Override public void load() {
         getActivity().runOnUiThread(() -> {
             SessionToken token = new SessionToken(getContext(), new ComponentName(getContext(), PlaybackService.class));
             future = new MediaController.Builder(getContext(), token).buildAsync();
-            future.addListener(() -> { try { controller = future.get(); } catch (Exception ignored) {} }, ContextCompat.getMainExecutor(getContext()));
+            future.addListener(() -> { try { controller = future.get(); controller.addListener(new Player.Listener() { @Override public void onIsPlayingChanged(boolean playing) { if (playing && fadeOnPlay) { fadeOnPlay = false; fadeTo(desiredVolume, false); } } }); } catch (Exception ignored) {} }, ContextCompat.getMainExecutor(getContext()));
         });
     }
     private void withPlayer(PluginCall call, Runnable action) {
@@ -49,6 +64,7 @@ public class KubePlayerPlugin extends Plugin {
     }
     @PluginMethod public void play(PluginCall call) {
         withPlayer(call, () -> {
+            cancelFade(); fadeOnPlay = !call.getBoolean("paused", false); controller.setVolume(fadeOnPlay ? 0f : desiredVolume);
             controller.setMediaItem(item(call.getString("url", ""), call.getString("title", ""), call.getString("artist", ""), call.getString("id", "")), (long)(Math.max(0, call.getDouble("position", 0.0)) * 1000));
             controller.prepare(); controller.setPlayWhenReady(!call.getBoolean("paused", false)); call.resolve();
         });
@@ -66,11 +82,11 @@ public class KubePlayerPlugin extends Plugin {
         });
     }
     @PluginMethod public void repeat(PluginCall call) { withPlayer(call, () -> { String mode = call.getString("mode", "off"); controller.setRepeatMode("one".equals(mode) ? Player.REPEAT_MODE_ONE : "all".equals(mode) ? Player.REPEAT_MODE_ALL : Player.REPEAT_MODE_OFF); call.resolve(); }); }
-    @PluginMethod public void resume(PluginCall call) { withPlayer(call, () -> { controller.play(); call.resolve(); }); }
-    @PluginMethod public void pause(PluginCall call) { withPlayer(call, () -> { controller.pause(); call.resolve(); }); }
-    @PluginMethod public void stop(PluginCall call) { withPlayer(call, () -> { controller.stop(); controller.clearMediaItems(); call.resolve(); }); }
+    @PluginMethod public void resume(PluginCall call) { withPlayer(call, () -> { cancelFade(); if (!controller.isPlaying()) { controller.setVolume(0f); fadeOnPlay = true; controller.play(); } else { fadeOnPlay = false; fadeTo(desiredVolume, false); } call.resolve(); }); }
+    @PluginMethod public void pause(PluginCall call) { withPlayer(call, () -> { fadeOnPlay = false; if (controller.isPlaying()) fadeTo(0f, true); else { cancelFade(); controller.pause(); } call.resolve(); }); }
+    @PluginMethod public void stop(PluginCall call) { withPlayer(call, () -> { cancelFade(); fadeOnPlay = false; controller.stop(); controller.clearMediaItems(); call.resolve(); }); }
     @PluginMethod public void seek(PluginCall call) { withPlayer(call, () -> { controller.seekTo((long)(Math.max(0, call.getDouble("seconds", 0.0)) * 1000)); call.resolve(); }); }
-    @PluginMethod public void volume(PluginCall call) { withPlayer(call, () -> { controller.setVolume((float)Math.max(0, Math.min(1, call.getDouble("value", 1.0)))); call.resolve(); }); }
+    @PluginMethod public void volume(PluginCall call) { withPlayer(call, () -> { desiredVolume = (float)Math.max(0, Math.min(1, call.getDouble("value", 1.0))); if (fade == null && !fadeOnPlay) controller.setVolume(desiredVolume); call.resolve(); }); }
     @PluginMethod public void status(PluginCall call) {
         withPlayer(call, () -> {
             JSObject value = new JSObject();

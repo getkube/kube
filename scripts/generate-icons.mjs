@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 process.chdir(fileURLToPath(new URL('..', import.meta.url)));
 const icon = await readFile('assets/favicons/dark-transparent.png');
 const rounded = icon;
+// Keep launcher artwork inside Android's adaptive-icon safe area.
+const androidIcon = await sharp(icon).trim().resize(256,256,{fit:'contain',background:'#00000000'}).extend({top:64,bottom:64,left:64,right:64,background:'#00000000'}).png().toBuffer();
 for (const file of ['brand/logo.png', 'brand/logo-rounded.png', 'website/assets/logo.png']) await writeFile(file, icon);
 await mkdir('build/icons', { recursive: true });
 await mkdir('public', { recursive: true });
@@ -33,13 +35,13 @@ for (let i = 0; i < data.length; i += 4) { const white = Math.min(data[i], data[
 const emblem = await sharp(data, { raw: info }).trim().png().toBuffer();
 const res = 'android/app/src/main/res';
 await mkdir(`${res}/drawable-nodpi`, { recursive: true });
-await writeFile(`${res}/drawable-nodpi/kube_logo.png`, await png(rounded, 384));
+await writeFile(`${res}/drawable-nodpi/kube_logo.png`, await png(androidIcon, 384));
 for (const [density, scale] of [['mdpi',1],['hdpi',1.5],['xhdpi',2],['xxhdpi',3],['xxxhdpi',4]]) {
   const directory = `${res}/mipmap-${density}`; await mkdir(directory, { recursive: true });
   const size = 48 * scale;
-  await writeFile(`${directory}/ic_launcher.png`, await png(icon, size));
+  await writeFile(`${directory}/ic_launcher.png`, await png(androidIcon, size));
   const circle = Buffer.from(`<svg width="${size}" height="${size}"><circle cx="${size/2}" cy="${size/2}" r="${size/2}" fill="white"/></svg>`);
-  await sharp(icon).resize(size, size).composite([{ input: circle, blend: 'dest-in' }]).png().toFile(`${directory}/ic_launcher_round.png`);
+  await sharp(androidIcon).resize(size, size).composite([{ input: circle, blend: 'dest-in' }]).png().toFile(`${directory}/ic_launcher_round.png`);
   const full = 108 * scale, safe = Math.round(full * 0.43);
   const foreground = await sharp({ create: { width: full, height: full, channels: 4, background: '#00000000' } }).composite([{ input: await png(emblem, safe), gravity: 'centre' }]).png().toBuffer();
   await writeFile(`${directory}/ic_launcher_foreground.png`, foreground);

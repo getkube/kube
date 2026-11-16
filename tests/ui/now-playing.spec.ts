@@ -23,6 +23,11 @@ test('expanded player preserves playback, manages queue, exposes tabs and update
   await expect(page).toHaveTitle('Kube - [playing Test song 1]');
   await expect.poll(()=>metadata.get('lmnopqrstuv')).toBe(1);
   await page.getByRole('button',{name:'Show queue',exact:true}).click();
+  await page.getByRole('button',{name:'Options for queued Test song 2',exact:true}).click();
+  await page.getByRole('menuitem',{name:'Add to playlist',exact:true}).click();
+  let picker=page.getByRole('dialog').filter({has:page.getByRole('heading',{name:'Add to playlist',exact:true})});
+  await picker.getByLabel('Or create a new playlist').fill('Queued songs');
+  await picker.getByRole('button',{name:'Create playlist',exact:true}).click();
   const drag=async(from:string,to:string,scope='main')=>{const a=(await page.locator(scope).getByRole('button',{name:`Reorder ${from}`,exact:true}).boundingBox())!;const b=(await page.locator(scope).getByRole('button',{name:`Reorder ${to}`,exact:true}).boundingBox())!;await page.mouse.move(a.x+a.width/2,a.y+a.height/2);await page.mouse.down();await page.mouse.move(b.x+b.width/2,b.y+b.height/2,{steps:12});await page.waitForTimeout(100);await page.mouse.up();};
   await drag('Test song 4','Test song 2');
   await expect(page.locator('.queue-song strong')).toHaveText(['Test song 1','Test song 4','Test song 2','Test song 3']);
@@ -41,7 +46,12 @@ test('expanded player preserves playback, manages queue, exposes tabs and update
   await page.getByRole('button',{name:'Expand now playing'}).click();
   const dialog=page.getByRole('dialog',{name:'Now playing'});
   await expect(dialog).toBeVisible();
+  await dialog.evaluate(async node=>{await Promise.all(node.getAnimations().map(animation=>animation.finished));});
   await expect(dialog.getByRole('heading',{name:'Test song 1'})).toBeVisible();
+  await dialog.getByRole('button',{name:'Options for queued Test song 3',exact:true}).click();
+  await dialog.getByRole('menuitem',{name:'Add to playlist',exact:true}).click();
+  picker=page.getByRole('dialog').filter({has:page.getByRole('heading',{name:'Add to playlist',exact:true})});
+  await picker.getByRole('button',{name:'Queued songs',exact:true}).click();
   await drag('Test song 4','Test song 3','dialog.now-playing-screen');
   await expect(dialog.locator('.queue-song strong')).toHaveText(['Test song 1','Test song 2','Test song 4','Test song 3']);
   await dialog.getByRole('button',{name:'Reorder Test song 4',exact:true}).press('End');
@@ -61,4 +71,10 @@ test('expanded player preserves playback, manages queue, exposes tabs and update
   await page.screenshot({path:'test-results/kube-now-playing-mobile.png'});
   await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);
   await expect(page).toHaveTitle('Kube - [paused Test song 2]');
+  await page.getByRole('button',{name:'Player options',exact:true}).click();
+  await page.getByRole('menuitem',{name:'Add to playlist',exact:true}).click();
+  picker=page.getByRole('dialog').filter({has:page.getByRole('heading',{name:'Add to playlist',exact:true})});
+  await picker.getByRole('button',{name:'Queued songs',exact:true}).click();
+  const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('CapacitorStorage.kube.library.v1')!).playlists[0].tracks.map((t:{videoId:string})=>t.videoId));
+  expect(saved).toEqual(['lmnopqrstuv','wxyzabcdefg']);
 });

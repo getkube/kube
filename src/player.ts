@@ -29,6 +29,12 @@ export class Player {
   private buffering?: AbortController;
   private startupReady = false;
   private priming = false;
+  private fadeTimer?: ReturnType<typeof setInterval>;
+  private cancelFade() { clearInterval(this.fadeTimer); this.fadeTimer=undefined; }
+  private fadeTo(target:number,done?:()=>void) {
+    this.cancelFade(); const from=this.audio.volume, start=performance.now();
+    this.fadeTimer=setInterval(()=>{const fraction=Math.min(1,(performance.now()-start)/250);this.audio.volume=from+(target-from)*fraction;if(fraction===1){this.cancelFade();done?.();}},16);
+  }
   private playIntent = false;
   private startPosition = 0;
   private fallingBack = false;
@@ -100,6 +106,7 @@ export class Player {
   }
   private async load(resumeAt = 0, keepSession = false) {
     const track = this.current(); if (!track) return;
+    this.cancelFade();
     const generation = ++this.generation;
     this.prefetch?.abort();
     this.buffering?.abort();
@@ -184,7 +191,7 @@ export class Player {
       if (generation !== this.generation || !this.playIntent) return;
       this.startupReady = true;
     }
-    try { await this.audio.play(); }
+    try { if(this.audio.paused)this.audio.volume=0; await this.audio.play(); if(generation!==this.generation||!this.playIntent)return; this.update({playing:true,loading:false,error:''}); this.fadeTo(this.library().settings.volume); }
     catch (error) {
       if (generation !== this.generation) return;
       if (error instanceof DOMException && error.name === 'NotAllowedError') this.update({ loading: false, error: 'Your audio is buffered. Press Play to start playback.' });
@@ -218,7 +225,7 @@ export class Player {
   pause() {
     this.playIntent = false;
     this.buffering?.abort();
-    if (this.native) void NativePlayer.pause().catch(() => this.failPlayback()); else this.audio.pause();
+    if (this.native) void NativePlayer.pause().catch(() => this.failPlayback()); else if(this.state.playing&&!this.priming)this.fadeTo(0,()=>{if(!this.playIntent)this.audio.pause();});else{this.cancelFade();this.audio.pause();}
     this.update({ playing: false, loading: false }); this.flush();
   }
   toggle() { if (this.state.playing || (this.playIntent && this.state.loading)) this.pause(); else void this.resume(); }
@@ -231,7 +238,7 @@ export class Player {
     if (this.native) void NativePlayer.seek({ seconds }).catch(() => this.failPlayback()); else this.audio.currentTime = seconds;
     this.update({ position: seconds });
   }
-  volume(value: number) { this.audio.volume = value; if (this.native) void NativePlayer.volume({ value }).catch(() => {}); }
+  volume(value: number) { this.cancelFade(); this.audio.volume = value; if(!this.native&&!this.playIntent)this.audio.pause(); if (this.native) void NativePlayer.volume({ value }).catch(() => {}); }
   private async syncNativeQueue() {
     if (!this.native || !this.current()) return;
     const api = new Invidious(this.library().settings);
@@ -288,6 +295,7 @@ export class Player {
   }
   private async ended() { this.handlingEnd = true; try { await this.next(true); } finally { this.handlingEnd = false; } }
   stop() {
+    this.cancelFade();
     this.prefetch?.abort();
     this.flush(); ++this.generation; this.nativePreparing = false; this.playIntent = false; this.buffering?.abort(); this.controller?.abort(); this.sources = [];
     this.audio.pause(); this.audio.removeAttribute('src'); this.audio.load();
