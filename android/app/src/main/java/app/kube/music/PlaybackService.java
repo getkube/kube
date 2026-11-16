@@ -2,11 +2,15 @@ package app.kube.music;
 
 import android.app.PendingIntent;
 import android.content.Intent;
+import android.webkit.WebSettings;
 import androidx.annotation.Nullable;
 import androidx.media3.common.AudioAttributes;
 import androidx.media3.common.C;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.DefaultLoadControl;
+import androidx.media3.datasource.DefaultDataSource;
+import androidx.media3.datasource.DefaultHttpDataSource;
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
 import androidx.media3.session.MediaSession;
 import androidx.media3.session.MediaSessionService;
 
@@ -19,7 +23,13 @@ public class PlaybackService extends MediaSessionService {
             .setBufferDurationsMs(10000, 300000, 10000, 2000)
             .setPrioritizeTimeOverSizeThresholds(true)
             .build();
-        ExoPlayer player = new ExoPlayer.Builder(this).setLoadControl(loadControl).build();
+        // Public media proxies can reject the default Media3 user-agent. Use the
+        // device's real WebView identity for the same compatibility as the web app.
+        DefaultHttpDataSource.Factory http = new DefaultHttpDataSource.Factory()
+            .setUserAgent(WebSettings.getDefaultUserAgent(this) + " Kube/" + BuildConfig.VERSION_NAME);
+        ExoPlayer player = new ExoPlayer.Builder(this).setLoadControl(loadControl)
+            .setMediaSourceFactory(new DefaultMediaSourceFactory(new DefaultDataSource.Factory(this, http)))
+            .build();
         player.setAudioAttributes(new AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(), true);
         player.setHandleAudioBecomingNoisy(true);
         player.setWakeMode(C.WAKE_MODE_NETWORK);
