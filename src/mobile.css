@@ -1,0 +1,75 @@
+.mobile-settings, .mobile-library-links, .search-submit { display: none; }
+
+@media (max-width: 560px) {
+  .app-shell { padding-bottom: calc(156px + env(safe-area-inset-bottom)); }
+  .workspace { background: #121212; }
+  .topbar {
+    display: grid; grid-template-columns: 44px minmax(0,1fr) 44px 44px;
+    grid-template-rows: 44px 48px; gap: 12px 4px; flex: none;
+    height: auto; min-height: 0; padding: calc(8px + env(safe-area-inset-top)) 16px 16px;
+    background: #121212; border: 0; align-items: center;
+  }
+  .drawer-trigger { left: 16px; top: calc(8px + env(safe-area-inset-top)); border: 0; background: #282828; border-radius: 50%; }
+  .mobile-brand { display: flex; grid-column: 2; grid-row: 1; gap: 8px; padding: 0 8px; justify-self: start; min-width: 0; }
+  .mobile-brand img { display: block; width: 25px; height: 25px; }
+  .mobile-brand span { font-weight: 750; font-size: 22px; letter-spacing: -.7px; }
+  .topbar>.icon-button:not(.mobile-settings), .topbar>.connection-badge { display: none; }
+  .topbar>.mobile-settings { display: grid; grid-column: 3; grid-row: 1; width: 44px; height: 44px; padding: 0; border: 0; background: transparent; }
+  .topbar>.account-button { display: grid; grid-column: 4; grid-row: 1; width: 44px; height: 44px; min-width: 44px; padding: 0; border: 0; border-radius: 50%; background: #303030; }
+  .topbar .search-box { grid-column: 1 / -1; grid-row: 2; width: 100%; max-width: none; height: 48px; gap: 10px; padding: 0 4px 0 14px; border: 0; border-radius: 8px; background: #f4f4f4; color: #171717; }
+  .topbar .search-box input { height: 48px; padding: 0; font-size: 16px; color: #171717; background: transparent; border: 0; }
+  .search-box input::placeholder { color: #565656; opacity: 1; }
+  .search-box input:focus-visible { outline-offset: -3px; }
+  .search-box>svg { flex: none; }
+  .search-submit { display: grid; place-items: center; width: 44px; min-width: 44px; height: 44px; padding: 0; background: transparent; border: 0; color: #222; }
+  .workspace>main { padding: 12px 16px 28px; }
+  h1, .listen-heading h1, .page-heading h1 { font-size: 26px; letter-spacing: -.7px; }
+  .listen-heading { gap: 12px; margin-bottom: 20px; align-items: center; }
+  .listen-heading p { font-size: 12px; max-width: none; }
+  .listen-heading .button-row { gap: 0; }
+  .listen-heading .primary { min-height: 44px; border-radius: 24px; padding: 10px 14px; }
+  .library-shortcuts { gap: 8px; margin-bottom: 28px; }
+  .library-shortcuts button { min-height: 64px; padding: 12px; font-size: 12px; background: #292929; border: 0; border-radius: 6px; }
+  .library-shortcuts button svg { width: 24px; height: 24px; color: #ffaaaa; }
+  .library-shortcuts small { font-size: 11px; }
+  .section-heading h2 { font-size: 22px; font-weight: 700; }
+  .track-row { gap: 10px; min-height: 72px; padding: 8px 0; border-bottom: 0; }
+  .track-row>.cover { width: 48px; height: 48px; flex: none; border-radius: 5px; }
+  .track-row .track-title { font-size: 14px; line-height: 1.4; min-height: 24px; }
+  .track-row .artist-link { font-size: 12px; min-height: 24px; }
+  .track-row>.duration, .track-row>.icon-button { display: none; }
+  .track-row .menu-wrap>.icon-button { min-width: 44px; min-height: 44px; }
+  .mobile-library-links { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 24px; }
+  .mobile-library-links button { min-height: 44px; border-radius: 24px; background: #292929; font-size: 12px; padding: 10px 12px; }
+  .recent-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .recent-track { display: block; padding: 0; border: 0; background: transparent; }
+  .recent-track>.cover { width: 100%; height: auto; aspect-ratio: 1; margin-bottom: 10px; border-radius: 8px; }
+  .recent-track>span { gap: 4px; }.recent-track strong { font-size: 13px; }.recent-track small { font-size: 12px; }
+  .player-bar { left: 8px; right: 8px; bottom: calc(72px + env(safe-area-inset-bottom)); height: 76px; padding: 8px 8px 18px; gap: 6px; border: 1px solid #3c3333; border-radius: 10px; background: #302829; box-shadow: 0 6px 22px #0005; }
+  .player-bar .now-playing { flex: 1; min-width: 0; gap: 10px; padding: 0; }
+  .player-bar .cover { width: 40px; height: 40px; flex: none; border-radius: 5px; }
+  .player-bar .now-copy { display: flex; flex: 1; gap: 4px; }
+  .now-copy strong { font-size: 12px; }.now-copy span { font-size: 11px; color: #c6bbbb; }
+  .player-bar .transport { display: contents; }
+  .transport-buttons { flex: none; }
+  .transport-buttons>.icon-button:not(.primary-play) { display: none; }
+  .transport-buttons>.icon-button:nth-child(4) { display: inline-flex; min-width: 44px; height: 44px; padding: 0; }
+  .transport-buttons>.primary-play { width: 44px; min-width: 44px; height: 44px; background: transparent; color: #fff!important; }
+  .player-bar .seek { position: absolute; left: 10px; right: 10px; bottom: 0; height: 20px; min-width: 0; margin: 0; }
+  .player-bar .seek input { height: 20px; background: transparent; }
+  .player-bar .seek input { appearance: none; -webkit-appearance: none; }
+  .player-bar .seek input::-webkit-slider-runnable-track { height: 3px; background: #ffffff40; border-radius: 3px; }
+  .player-bar .seek input::-webkit-slider-thumb { appearance: none; -webkit-appearance: none; width: 10px; height: 10px; margin-top: -3.5px; background: #fff; border-radius: 50%; }
+  .player-bar .seek input::-moz-range-track { height: 3px; background: #ffffff40; border-radius: 3px; }
+  .player-bar .seek input::-moz-range-thumb { width: 10px; height: 10px; border: 0; background: #fff; border-radius: 50%; }
+  .player-extras { position: static; gap: 0; }
+  .player-extras .icon-button { margin: 0; width: 44px; height: 44px; padding: 0; color: #eee; }
+  .player-extras>.icon-button:first-child { display: none; }
+  .mobile-nav { height: calc(68px + env(safe-area-inset-bottom)); padding: 4px 12px calc(4px + env(safe-area-inset-bottom)); background: linear-gradient(#121212ee,#121212); border: 0; }
+  .mobile-nav button { flex: 1; min-height: 56px; gap: 5px; padding: 5px 8px; font-size: 11px; color: #aaa; }
+  .mobile-nav button svg { width: 24px; height: 24px; }
+  .mobile-nav button.current { color: #fff; font-weight: 650; }
+  .mobile-nav button.current svg { fill: #ffffff22; stroke-width: 2.5; }
+  .settings-card { padding: 20px 16px; }.settings-card input, dialog input { font-size: 16px; }
+  .toast, .update-notice { bottom: calc(164px + env(safe-area-inset-bottom)); }
+}

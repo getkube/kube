@@ -5,6 +5,7 @@ import { AppProvider } from './context';
 import { App } from './App';
 import './styles.css';
 import './app-layout.css';
+import './mobile.css';
 class Boundary extends React.Component<{ children: React.ReactNode }, { error: boolean }> {
   state = { error: false };
   static getDerivedStateFromError() { return { error: true }; }

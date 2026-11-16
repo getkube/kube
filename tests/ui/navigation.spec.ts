@@ -26,9 +26,10 @@ test('mobile layout keeps library and queue controls accessible', async ({ page 
   await expect(page.getByRole('navigation', { name: 'Library shortcuts' }).getByRole('button', { name: /Artists/ })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: 'test-results/kube-mobile.png', fullPage: true });
-  await page.getByRole('button', { name: 'Show queue', exact: true }).click();
+  await page.getByRole('button', { name: 'Open navigation', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Queue', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Up next', exact: true })).toBeVisible();
-  await page.getByRole('navigation', { name: 'Mobile navigation' }).getByRole('button', { name: 'Settings' }).click();
+  await page.getByRole('button', { name: 'Open settings', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
 });
 
@@ -40,7 +41,8 @@ test('player seek and playback controls share a compact row', async ({ page }) =
     const play = await page.locator('.primary-play').boundingBox();
     expect(seek).not.toBeNull();
     expect(play).not.toBeNull();
-    expect(Math.abs(seek!.y + seek!.height / 2 - play!.y - play!.height / 2)).toBeLessThan(5);
+    if (width > 560) expect(Math.abs(seek!.y + seek!.height / 2 - play!.y - play!.height / 2)).toBeLessThan(5);
+    else { await expect(page.locator('.now-copy')).toBeVisible(); expect(seek!.y).toBeGreaterThan(play!.y); }
     expect((await page.locator('.player-bar').boundingBox())!.height).toBeLessThanOrEqual(76);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   }
@@ -72,4 +74,24 @@ test('sidebar choice persists and settings cannot scroll the app shell', async (
   await page.getByRole('button', {name:'Player options',exact:true}).click();
   await page.getByRole('menuitem', {name:'Audio quality',exact:true}).click();
   await expect(page.getByRole('radio', {name:/Normal/})).toBeChecked();
+});
+
+test('mobile header aligns search and keeps navigation reachable at phone sizes', async ({page}) => {
+  for (const width of [320,390,430,560]) {
+    await page.setViewportSize({width,height:740});
+    await page.goto('/',{waitUntil:'domcontentloaded'});
+    const search = await page.locator('.search-box').boundingBox();
+    const menu = await page.getByRole('button',{name:'Open navigation'}).boundingBox();
+    const account = await page.locator('.account-button').boundingBox();
+    expect(search!.x).toBe(16); expect(search!.width).toBe(width-32);
+    expect(search!.y).toBeGreaterThanOrEqual(menu!.y+menu!.height);
+    expect(menu!.y).toBe(account!.y); expect(menu!.height).toBeGreaterThanOrEqual(44);
+    await page.getByRole('navigation',{name:'Mobile navigation'}).getByRole('button',{name:'Search',exact:true}).click();
+    await expect(page.getByRole('searchbox',{name:'Search music'})).toBeFocused();
+    await page.getByRole('navigation',{name:'Mobile navigation'}).getByRole('button',{name:'Library',exact:true}).click();
+    await page.getByRole('navigation',{name:'Your library'}).getByRole('button',{name:'Liked songs'}).click();
+    await expect(page.getByRole('heading',{name:'Liked songs',exact:true})).toBeVisible();
+    await expect(page.getByRole('navigation',{name:'Mobile navigation'}).getByRole('button',{name:'Library',exact:true})).toHaveAttribute('aria-current','page');
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  }
 });
