@@ -1,5 +1,5 @@
 export type AudioQuality = 'high' | 'normal' | 'low';
-export type AudioFormat = { itag: string; type: string; bitrate: number };
+export type AudioFormat = { itag: string; type: string; bitrate: number; url?: string };
 export function audioFormats(formats: AudioFormat[], quality: AudioQuality, supported: (type:string)=>boolean) {
   const available = formats.filter(format => supported(format.type)).sort((a,b) => b.bitrate-a.bitrate);
   if (quality === 'high' || !available.length) return available;

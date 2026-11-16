@@ -47,7 +47,7 @@ export async function requestJson(url: string, signal?: AbortSignal): Promise<un
     throw new ApiError(`Cannot reach this Invidious API. Check your connection or choose another instance in Settings.${!Capacitor.isNativePlatform() && !window.kubeDesktop ? ' Web access also requires CORS support.' : ''}`);
   }
 }
-type VideoDetail = { track: Track; related: Track[]; formats: { itag: string; type: string; bitrate: number }[] };
+type VideoDetail = { track: Track; related: Track[]; formats: { itag: string; type: string; bitrate: number; url?: string }[] };
 const cache = new Map<string, { expires: number; data: VideoDetail }>();
 export class Invidious {
   origin: string;
@@ -88,11 +88,11 @@ export class Invidious {
     const key = `${this.origin}:${this.settings.region}:${id}`;
     const hit = cache.get(key);
     if (hit && hit.expires > Date.now()) return hit.data;
-    const raw = await this.get(`videos/${id}`, {}, signal) as Record<string, unknown>;
+    const raw = await this.get(`videos/${id}`, { local: 'true' }, signal) as Record<string, unknown>;
     const track = trackSchema.parse(raw);
     const formats = (Array.isArray(raw.adaptiveFormats) ? raw.adaptiveFormats : []).flatMap((f: Record<string, unknown>) => {
       if (typeof f.type !== 'string' || !f.type.startsWith('audio/') || !/^\d+$/.test(String(f.itag))) return [];
-      return [{ itag: String(f.itag), type: f.type, bitrate: Number(f.bitrate) || 0 }];
+      return [{ itag: String(f.itag), type: f.type, bitrate: Number(f.bitrate) || 0, url: typeof f.url === 'string' ? f.url : undefined }];
     });
     const data = { track, related: tracksFrom(raw.recommendedVideos), formats };
     if (cache.size > 100) cache.delete(cache.keys().next().value!);
@@ -110,7 +110,10 @@ export class Invidious {
   async related(id: string, signal?: AbortSignal) {
     return catalogRelated(this.settings, id, signal);
   }
-  stream(id: string, itag: string) {
+  stream(id: string, itag: string, resolved?: string) {
+    if (resolved) {
+      try { const url = new URL(resolved, this.origin); if (url.origin === this.origin && url.pathname === '/videoplayback' && !url.username && !url.password) return url.href; } catch { /* Fall back to the instance resolver. */ }
+    }
     return `${this.origin}/latest_version?${new URLSearchParams({ id, itag, local: 'true' })}`;
   }
   async health() {
@@ -119,9 +122,9 @@ export class Invidious {
     return `${tracks.length} search results received. Playback still depends on the instance’s media proxy.`;
   }
 }
-export function thumbnail(track: Track, origin: string) {
+export function thumbnail(track: Track, origin: string, large = false) {
   // Fetch artwork through the chosen instance; never send the listener to Google image hosts.
-  return `${origin}/vi/${encodeURIComponent(track.videoId)}/mqdefault.jpg`;
+  return `${origin}/vi/${encodeURIComponent(track.videoId)}/${large ? 'hqdefault' : 'mqdefault'}.jpg`;
 }
 export async function discoverInstances() {
   const raw = await requestJson('https://api.invidious.io/');

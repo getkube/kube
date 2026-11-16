@@ -98,6 +98,12 @@ export async function catalogRelated(settings: Settings, id: string, signal?: Ab
   signal?.throwIfAborted();
   return catalogTracks(panel).filter(t => t.videoId !== id);
 }
+export async function catalogLyrics(settings: Settings, id: string, signal?: AbortSignal) {
+  const info = await (await client(settings, signal)).music.getInfo(id);
+  const lyrics = await info.getLyrics();
+  signal?.throwIfAborted();
+  return { text: lyrics?.description?.toString() || '', source: lyrics?.footer?.toString() || '' };
+}
 export async function catalogClassify(settings: Settings, track: Track, signal?: AbortSignal) {
   if (musicIds.has(track.videoId) || track.musicSource === 'youtube-music') return true;
   const result = await catalogSearch(settings, track.title, 1, signal);

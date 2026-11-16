@@ -1,3 +1,5 @@
+import { NowPlaying } from './NowPlaying';
+import { usePlaybackTitle } from './playback-title';
 import { AccountButton, AccountPage } from './Account';
 import { DesktopWindow } from './DesktopWindow';
 import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from 'react';
@@ -17,6 +19,8 @@ export function App() {
   const { library: stored, update, player, notice, notify, storageWarning } = useApp();
   const library = useMusicLibrary(stored, update);
   const playback = useSyncExternalStore(player.subscribe, player.snapshot);
+  const [expandedPlayer,setExpandedPlayer] = useState(false);
+  usePlaybackTitle(playback, player.current());
   const [view, setView] = useState<View>('home');
   const [search, setSearch] = useState(''); const [query, setQuery] = useState('');
   const [results, setResults] = useState<Track[]>([]); const [recs, setRecs] = useState<Recommendation[]>([]);
@@ -140,7 +144,8 @@ export function App() {
 
     </main></div>
     <nav className="mobile-nav" aria-label="Mobile navigation">{[{ id: 'home' as View, title: 'Home', icon: Home }, { id: 'search' as View, title: 'Search', icon: Search }, { id: 'playlists' as View, title: 'Library', icon: Library }].map(({ id, title, icon: Icon }) => <button aria-current={view === id || (id === 'playlists' && ['liked','artists','history','playlist'].includes(view)) ? 'page' : undefined} className={view === id || (id === 'playlists' && ['liked','artists','history','playlist'].includes(view)) ? 'current' : ''} key={id} onClick={() => navigate(id)}><Icon size={19} /><span>{title}</span></button>)}</nav>
-    <PlayerBar openQueue={() => navigate('queue')} />
+    <PlayerBar openQueue={() => navigate('queue')} openPlayer={() => setExpandedPlayer(true)} />
+    {expandedPlayer && <NowPlaying close={() => setExpandedPlayer(false)} />}
     <UpdateNotice />
     {notice && <div className="toast" role="status">{notice}</div>}
     {playlistModal && <Modal title={playlistModal === 'add' ? 'Add to playlist' : playlistModal === 'rename' ? 'Rename playlist' : 'Create a playlist'} close={() => setPlaylistModal(null)}>{playlistModal === 'add' && <div className="playlist-choices">{library.playlists.map(p => <button key={p.id} onClick={() => { if (trackToAdd) update(old => ({ ...old, playlists: old.playlists.map(list => list.id === p.id ? { ...list, tracks: uniqueTracks([...list.tracks, trackToAdd]) } : list) })); setPlaylistModal(null); notify(`Added to ${p.name}`); }}><ListMusic size={19} />{p.name}<Plus size={16} /></button>)}</div>}<form onSubmit={createPlaylist}><label htmlFor="playlist-name">{playlistModal === 'add' ? 'Or create a new playlist' : 'Playlist name'}</label><input id="playlist-name" autoFocus required maxLength={120} value={playlistName} onChange={e => setPlaylistName(e.target.value)} placeholder="Playlist name" /><button className="primary modal-submit" disabled={!playlistName.trim()} type="submit">{playlistModal === 'rename' ? 'Save name' : 'Create playlist'}</button></form></Modal>}

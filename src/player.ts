@@ -17,6 +17,7 @@ export class Player {
   private native = Capacitor.isNativePlatform();
   private generation = 0;
   private controller?: AbortController;
+  private prefetch?: AbortController;
   private listened = 0;
   private started = 0;
   private lastPosition = 0;
@@ -100,6 +101,7 @@ export class Player {
   private async load(resumeAt = 0, keepSession = false) {
     const track = this.current(); if (!track) return;
     const generation = ++this.generation;
+    this.prefetch?.abort();
     this.buffering?.abort();
     this.startupReady = false;
     this.startPosition = resumeAt;
@@ -119,11 +121,12 @@ export class Player {
       const detail = await api.video(track.videoId, this.controller.signal, track);
       if (generation !== this.generation) return;
       this.formats = audioFormats(detail.formats, this.library().settings.audioQuality, type => this.native || Boolean(this.audio.canPlayType(type)));
-      this.sources = this.formats.map(format => api.stream(track.videoId, format.itag));
+      this.sources = this.formats.map(format => api.stream(track.videoId, format.itag, format.url));
       this.update({ duration: detail.track.lengthSeconds || track.lengthSeconds, bufferTarget: Math.min(10, detail.track.lengthSeconds || 10) });
       if (!this.sources.length) throw new Error('This track has no supported audio stream. It may be restricted or unavailable.');
       if ('mediaSession' in navigator && !this.native) navigator.mediaSession.metadata = new MediaMetadata({ title: track.title, artist: track.author, album: 'Kube' });
       await this.startSource(generation);
+      if (generation === this.generation) this.prefetchNext();
     } catch (e) {
       if (generation === this.generation) { this.nativePreparing = false; this.update({ loading: false, playing: false, error: e instanceof Error ? e.message : 'Could not load track.' }); }
     }
@@ -150,6 +153,13 @@ export class Player {
       this.audio.load();
       await this.playBuffered(generation);
     }
+  }
+  private prefetchNext() {
+    const next = this.state.queue[this.state.index + 1];
+    if (!next || !next.musicVerified) return;
+    this.prefetch?.abort(); this.prefetch = new AbortController();
+    // Metadata only: no speculative audio downloads or additional catalog searches.
+    void new Invidious(this.library().settings).video(next.videoId, this.prefetch.signal, next).catch(() => {});
   }
   private async playBuffered(generation: number) {
     if (generation !== this.generation) return;
@@ -273,6 +283,7 @@ export class Player {
   }
   private async ended() { this.handlingEnd = true; try { await this.next(true); } finally { this.handlingEnd = false; } }
   stop() {
+    this.prefetch?.abort();
     this.flush(); ++this.generation; this.nativePreparing = false; this.playIntent = false; this.buffering?.abort(); this.controller?.abort(); this.sources = [];
     this.audio.pause(); this.audio.removeAttribute('src'); this.audio.load();
     if (this.native) void NativePlayer.stop().catch(() => {});

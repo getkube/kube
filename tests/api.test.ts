@@ -15,6 +15,11 @@ describe('Invidious client', () => {
     const api = new Invidious({ ...defaultLibrary().settings, instance: 'https://example.com' });
     expect(api.stream('5NV6Rdv1a3I', '140')).toBe('https://example.com/latest_version?id=5NV6Rdv1a3I&itag=140&local=true');
   });
+  it('reuses resolved proxy URLs but never accepts a different media origin',()=>{
+    const api = new Invidious({...defaultLibrary().settings,instance:'https://example.com'});
+    expect(api.stream('5NV6Rdv1a3I','140','https://example.com/videoplayback?token=abc')).toBe('https://example.com/videoplayback?token=abc');
+    for(const url of ['https://googlevideo.com/videoplayback?token=abc','https://example.com/other','https://user:pass@example.com/videoplayback']) expect(api.stream('5NV6Rdv1a3I','140',url)).toContain('/latest_version?');
+  });
   it('does not return late native/desktop results after navigation aborts', async () => {
     const abort = new AbortController(); vi.stubGlobal('window', { kubeDesktop: { request: async () => { abort.abort(); return []; } } });
     await expect(requestJson('https://example.com/api/v1/search', abort.signal)).rejects.toMatchObject({ name: 'AbortError' });
