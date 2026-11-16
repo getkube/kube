@@ -49,8 +49,8 @@ public class KubePlayerPlugin extends Plugin {
     }
     @PluginMethod public void play(PluginCall call) {
         withPlayer(call, () -> {
-            controller.setMediaItem(item(call.getString("url", ""), call.getString("title", ""), call.getString("artist", ""), call.getString("id", "")));
-            controller.prepare(); controller.play(); call.resolve();
+            controller.setMediaItem(item(call.getString("url", ""), call.getString("title", ""), call.getString("artist", ""), call.getString("id", "")), (long)(Math.max(0, call.getDouble("position", 0.0)) * 1000));
+            controller.prepare(); controller.setPlayWhenReady(!call.getBoolean("paused", false)); call.resolve();
         });
     }
     @PluginMethod public void upcoming(PluginCall call) {
@@ -75,6 +75,8 @@ public class KubePlayerPlugin extends Plugin {
         withPlayer(call, () -> {
             JSObject value = new JSObject();
             value.put("playing", controller.isPlaying());
+            value.put("loading", controller.getPlayWhenReady() && controller.getPlaybackState() == Player.STATE_BUFFERING);
+            value.put("buffered", Math.max(0, controller.getBufferedPosition() - controller.getCurrentPosition()) / 1000.0);
             value.put("position", controller.getCurrentPosition() / 1000.0);
             value.put("duration", Math.max(0, controller.getDuration()) / 1000.0);
             value.put("ended", controller.getPlaybackState() == Player.STATE_ENDED);

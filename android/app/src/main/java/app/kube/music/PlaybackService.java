@@ -6,6 +6,7 @@ import androidx.annotation.Nullable;
 import androidx.media3.common.AudioAttributes;
 import androidx.media3.common.C;
 import androidx.media3.exoplayer.ExoPlayer;
+import androidx.media3.exoplayer.DefaultLoadControl;
 import androidx.media3.session.MediaSession;
 import androidx.media3.session.MediaSessionService;
 
@@ -14,7 +15,11 @@ public class PlaybackService extends MediaSessionService {
     private MediaSession mediaSession;
     @Override public void onCreate() {
         super.onCreate();
-        ExoPlayer player = new ExoPlayer.Builder(this).build();
+        DefaultLoadControl loadControl = new DefaultLoadControl.Builder()
+            .setBufferDurationsMs(10000, 300000, 10000, 2000)
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build();
+        ExoPlayer player = new ExoPlayer.Builder(this).setLoadControl(loadControl).build();
         player.setAudioAttributes(new AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(), true);
         player.setHandleAudioBecomingNoisy(true);
         player.setWakeMode(C.WAKE_MODE_NETWORK);

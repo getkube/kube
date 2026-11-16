@@ -21,6 +21,7 @@ test('mobile layout keeps library and queue controls accessible', async ({ page 
   await page.getByRole('button', { name: 'Open navigation' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Artists', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Your artists' })).toBeVisible();
+  await expect(page.getByRole('complementary', {name:'Sidebar'})).toBeHidden();
   await page.getByRole('navigation', { name: 'Mobile navigation' }).getByRole('button', { name: 'Home' }).click();
   await expect(page.getByRole('navigation', { name: 'Library shortcuts' }).getByRole('button', { name: /Artists/ })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
@@ -43,4 +44,32 @@ test('player seek and playback controls share a compact row', async ({ page }) =
     expect((await page.locator('.player-bar').boundingBox())!.height).toBeLessThanOrEqual(76);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   }
+});
+
+test('sidebar choice persists and settings cannot scroll the app shell', async ({ page }) => {
+  await page.setViewportSize({width: 1200, height: 650});
+  await page.goto('/', {waitUntil:'domcontentloaded'});
+  const rail = page.getByRole('complementary', {name:'Sidebar'});
+  await page.getByRole('button', {name:'Expand sidebar', exact:true}).click();
+  await expect(rail).toHaveClass(/expanded/);
+  await page.reload({waitUntil:'domcontentloaded'});
+  await expect(page.getByRole('button', {name:'Collapse sidebar', exact:true})).toBeVisible();
+  await rail.getByRole('button', {name:'Settings',exact:true}).click();
+  await expect(page.getByRole('heading', {name:'Settings',exact:true})).toBeVisible();
+  await page.locator('main').evaluate(node => { node.scrollTop = 100000; });
+  await page.locator('main').hover();
+  await page.mouse.wheel(0, 100000);
+  const scroll = await page.evaluate(() => ({body:scrollY,main:document.querySelector('main')!.scrollTop,max:document.querySelector('main')!.scrollHeight-document.querySelector('main')!.clientHeight}));
+  expect(scroll.body).toBe(0); expect(Math.abs(scroll.main-scroll.max)).toBeLessThanOrEqual(1);
+  await page.getByRole('button', {name:'Collapse sidebar',exact:true}).click();
+  await rail.hover(); await expect(rail).not.toHaveClass(/expanded/);
+  await page.getByRole('button', {name:'Player options',exact:true}).click();
+  await page.getByRole('menuitem', {name:'Audio quality',exact:true}).click();
+  await page.getByRole('radio', {name:/Normal/}).check();
+  await page.getByRole('button', {name:'Close dialog'}).click();
+  await page.reload({waitUntil:'domcontentloaded'});
+  await expect(page.getByRole('button', {name:'Expand sidebar',exact:true})).toBeVisible();
+  await page.getByRole('button', {name:'Player options',exact:true}).click();
+  await page.getByRole('menuitem', {name:'Audio quality',exact:true}).click();
+  await expect(page.getByRole('radio', {name:/Normal/})).toBeChecked();
 });

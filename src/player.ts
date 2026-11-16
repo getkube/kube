@@ -1,3 +1,4 @@
+import { audioFormats, formatLabel, prepareAudio, type AudioFormat } from './audio-quality';
 import { Capacitor } from '@capacitor/core';
 import { Invidious } from './api';
 import { NativePlayer } from './native';
@@ -5,11 +6,12 @@ import { rankRecommendations } from './recommendations';
 import { type Library, type Listen, type Track, uniqueTracks } from './model';
 
 export type PlayerState = {
+  buffered: number; bufferTarget: number; qualityLabel: string;
   queue: Track[]; index: number; playing: boolean; loading: boolean;
   position: number; duration: number; error: string; repeat: 'off' | 'all' | 'one';
 };
 export class Player {
-  private state: PlayerState = { queue: [], index: -1, playing: false, loading: false, position: 0, duration: 0, error: '', repeat: 'off' };
+  private state: PlayerState = { buffered: 0, bufferTarget: 10, qualityLabel: 'No stream selected', queue: [], index: -1, playing: false, loading: false, position: 0, duration: 0, error: '', repeat: 'off' };
   private listeners = new Set<() => void>();
   private audio = new Audio();
   private native = Capacitor.isNativePlatform();
@@ -22,15 +24,24 @@ export class Player {
   private sessionTrack?: Track;
   private sourceIndex = 0;
   private sources: string[] = [];
+  private formats: AudioFormat[] = [];
+  private buffering?: AbortController;
+  private startupReady = false;
+  private priming = false;
+  private playIntent = false;
+  private startPosition = 0;
+  private fallingBack = false;
+  private nativePreparing = false;
+  private metadataSeek?: () => void;
   private nativeTimer?: ReturnType<typeof setInterval>;
   private handlingEnd = false;
   constructor(private library: () => Library, private record: (listen: Listen) => void) {
-    this.audio.preload = 'none';
-    this.audio.addEventListener('timeupdate', () => this.progress(this.audio.currentTime, this.audio.duration));
-    this.audio.addEventListener('playing', () => this.update({ playing: true, loading: false, error: '' }));
-    this.audio.addEventListener('pause', () => { this.update({ playing: false }); this.flush(); });
-    this.audio.addEventListener('waiting', () => this.update({ loading: true }));
-    this.audio.addEventListener('ended', () => { void this.ended(); });
+    this.audio.preload = 'auto';
+    this.audio.addEventListener('timeupdate', () => { if (!this.priming) this.progress(this.audio.currentTime, this.audio.duration); });
+    this.audio.addEventListener('playing', () => { if (!this.priming) this.update({ playing: true, loading: false, error: '' }); });
+    this.audio.addEventListener('pause', () => { if (!this.priming) { this.update({ playing: false }); this.flush(); } });
+    this.audio.addEventListener('waiting', () => { if (this.playIntent) this.update({ loading: true }); });
+    this.audio.addEventListener('ended', () => { if (!this.priming) void this.ended(); });
     this.audio.addEventListener('error', () => { void this.fallback(); });
     if (this.native) this.nativeTimer = setInterval(() => { void this.poll(); }, 1000);
     if ('mediaSession' in navigator && !this.native) {
@@ -61,7 +72,7 @@ export class Player {
     }
   }
   private async poll() {
-    if (this.state.index < 0 || this.state.loading) return;
+    if (this.state.index < 0 || this.nativePreparing) return;
     try {
       const s = await NativePlayer.status();
       if (s.id && s.id !== this.current()?.videoId) {
@@ -71,7 +82,7 @@ export class Player {
           this.sessionTrack = this.state.queue[index]; this.sources = []; this.update({ index });
         }
       }
-      this.update({ playing: s.playing }); this.progress(s.position, s.duration);
+      this.update({ playing: s.playing, loading: s.loading ?? false, buffered: s.buffered ?? 0 }); this.progress(s.position, s.duration);
       if (s.error && !this.state.error) { if (this.sources.length) await this.fallback(); else this.failPlayback(); }
       if (s.ended && !this.handlingEnd && !this.state.error) await this.ended();
     } catch { this.update({ error: 'Android playback service is unavailable.', playing: false }); }
@@ -86,66 +97,125 @@ export class Player {
     this.update({ queue: list, index: list.findIndex(t => t.videoId === track.videoId) });
     await this.load();
   }
-  private async load() {
+  private async load(resumeAt = 0, keepSession = false) {
     const track = this.current(); if (!track) return;
     const generation = ++this.generation;
+    this.buffering?.abort();
+    this.startupReady = false;
+    this.startPosition = resumeAt;
+    this.nativePreparing = this.native;
+    if (!keepSession) this.playIntent = true;
     this.controller?.abort(); this.controller = new AbortController();
     this.sources = []; this.sourceIndex = 0;
     this.audio.pause(); this.audio.removeAttribute('src'); this.audio.load();
     if (this.native) await NativePlayer.stop().catch(() => {});
     if (generation !== this.generation) return;
-    this.listened = 0; this.savedAt = 0; this.lastPosition = 0; this.started = Date.now();
+    if (!keepSession) { this.listened = 0; this.savedAt = 0; this.started = Date.now(); }
+    this.lastPosition = resumeAt;
     this.sessionTrack = track;
-    this.update({ position: 0, duration: track.lengthSeconds, loading: true, playing: false, error: '' });
+    this.update({ position: resumeAt, duration: track.lengthSeconds, buffered: 0, bufferTarget: Math.min(10, track.lengthSeconds || 10), loading: true, playing: false, error: '' });
     try {
       const api = new Invidious(this.library().settings);
       const detail = await api.video(track.videoId, this.controller.signal, track);
       if (generation !== this.generation) return;
-      const formats = detail.formats.filter(f => this.native || Boolean(this.audio.canPlayType(f.type))).sort((a, b) => Number(b.type.startsWith('audio/mp4')) - Number(a.type.startsWith('audio/mp4')) || b.bitrate - a.bitrate);
-      this.sources = formats.map(f => api.stream(track.videoId, f.itag));
+      this.formats = audioFormats(detail.formats, this.library().settings.audioQuality, type => this.native || Boolean(this.audio.canPlayType(type)));
+      this.sources = this.formats.map(format => api.stream(track.videoId, format.itag));
+      this.update({ duration: detail.track.lengthSeconds || track.lengthSeconds, bufferTarget: Math.min(10, detail.track.lengthSeconds || 10) });
       if (!this.sources.length) throw new Error('This track has no supported audio stream. It may be restricted or unavailable.');
       if ('mediaSession' in navigator && !this.native) navigator.mediaSession.metadata = new MediaMetadata({ title: track.title, artist: track.author, album: 'Kube' });
       await this.startSource(generation);
     } catch (e) {
-      if (generation === this.generation) this.update({ loading: false, playing: false, error: e instanceof Error ? e.message : 'Could not load track.' });
+      if (generation === this.generation) { this.nativePreparing = false; this.update({ loading: false, playing: false, error: e instanceof Error ? e.message : 'Could not load track.' }); }
     }
   }
   private async startSource(generation: number) {
     const track = this.current(); if (!track || generation !== this.generation) return;
+    this.buffering?.abort();
+    this.startupReady = false;
+    this.update({ qualityLabel: formatLabel(this.formats[this.sourceIndex]), loading: this.playIntent, buffered: 0 });
     if (this.native) {
-      await NativePlayer.play({ url: this.sources[this.sourceIndex], title: track.title, artist: track.author, id: track.videoId });
+      this.nativePreparing = true;
+      await NativePlayer.play({ url: this.sources[this.sourceIndex], title: track.title, artist: track.author, id: track.videoId, position: this.startPosition, paused: !this.playIntent });
+      if (generation !== this.generation) return;
+      this.nativePreparing = false;
       await NativePlayer.volume({ value: this.library().settings.volume });
-      await this.syncNativeQueue();
-      this.update({ loading: false, playing: true });
+      void this.syncNativeQueue().catch(() => {});
     } else {
+      if (this.metadataSeek) this.audio.removeEventListener('loadedmetadata', this.metadataSeek);
+      const seekStart = () => { if (generation === this.generation && this.startPosition > 0) this.audio.currentTime = this.startPosition; };
+      this.metadataSeek = seekStart;
+      this.audio.addEventListener('loadedmetadata', seekStart, { once: true });
       this.audio.src = this.sources[this.sourceIndex];
       this.audio.volume = this.library().settings.volume;
-      try { await this.audio.play(); }
-      catch (e) {
-        if (generation !== this.generation) return;
-        if (e instanceof DOMException && e.name === 'NotAllowedError') this.update({ loading: false, error: 'Your browser requires another tap. Press Play to start audio.' });
-        // Media failures trigger the error event, which tries the next supported format.
-        else if (!(e instanceof DOMException && ['AbortError', 'NotSupportedError'].includes(e.name))) throw e;
-      }
+      this.audio.load();
+      await this.playBuffered(generation);
+    }
+  }
+  private async playBuffered(generation: number) {
+    if (generation !== this.generation) return;
+    if (!this.playIntent) { this.update({ loading: false }); return; }
+    if (!this.startupReady) {
+      const controller = new AbortController();
+      this.buffering?.abort();
+      this.buffering = controller;
+      this.priming = true;
+      this.update({ loading: true });
+      try {
+        await prepareAudio(this.audio, 10, controller.signal, seconds => {
+          if (generation === this.generation) this.update({ buffered: Math.round(seconds * 10) / 10 });
+        }, this.state.position);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        if (error instanceof DOMException && error.name === 'NotAllowedError') {
+          this.update({ loading: false, error: 'Press Play to buffer and start playback.' }); return;
+        }
+        throw error;
+      } finally { if (this.buffering === controller) { this.buffering = undefined; this.priming = false; } }
+      if (generation !== this.generation || !this.playIntent) return;
+      this.startupReady = true;
+    }
+    try { await this.audio.play(); }
+    catch (error) {
+      if (generation !== this.generation) return;
+      if (error instanceof DOMException && error.name === 'NotAllowedError') this.update({ loading: false, error: 'Your audio is buffered. Press Play to start playback.' });
+      else if (!(error instanceof DOMException && ['AbortError', 'NotSupportedError'].includes(error.name))) throw error;
     }
   }
   private async fallback() {
-    if (!this.sources.length) return;
-    if (++this.sourceIndex < Math.min(this.sources.length, 3)) {
-      try { await this.startSource(this.generation); } catch { this.failPlayback(); }
-    } else this.failPlayback();
+    if (!this.sources.length || this.fallingBack) return;
+    this.fallingBack = true;
+    const generation = this.generation;
+    this.startPosition = this.state.position;
+    try {
+      while (++this.sourceIndex < Math.min(this.sources.length, 3)) {
+        if (generation !== this.generation) return;
+        try { await this.startSource(generation); return; } catch { if (generation !== this.generation) return; }
+      }
+      this.failPlayback();
+    } finally { this.fallingBack = false; }
   }
-  private failPlayback() { this.update({ loading: false, playing: false, error: 'The instance could not serve this audio. Try another track or change the instance in Settings. Your queue is preserved.' }); }
+  private failPlayback() { this.nativePreparing = false; this.update({ loading: false, playing: false, error: 'The instance could not serve this audio. Try another track or change the instance in Settings. Your queue is preserved.' }); }
   async resume() {
     if (!this.current()) return;
-    if (this.state.error && !this.state.error.includes('another tap')) return this.load();
+    this.playIntent = true;
+    if (this.state.error && !this.state.error.includes('Press Play')) return this.load(this.state.position, true);
+    this.update({ error: '' });
     try {
-      if (this.native) await NativePlayer.resume(); else await this.audio.play();
-      this.update({ playing: true, error: '' });
+      if (this.native) { await NativePlayer.resume(); this.update({ loading: true }); }
+      else await this.playBuffered(this.generation);
     } catch { this.failPlayback(); }
   }
-  pause() { if (this.native) void NativePlayer.pause().catch(() => this.failPlayback()); else this.audio.pause(); this.update({ playing: false, loading: false }); this.flush(); }
-  toggle() { if (this.state.playing) this.pause(); else void this.resume(); }
+  pause() {
+    this.playIntent = false;
+    this.buffering?.abort();
+    if (this.native) void NativePlayer.pause().catch(() => this.failPlayback()); else this.audio.pause();
+    this.update({ playing: false, loading: false }); this.flush();
+  }
+  toggle() { if (this.state.playing || (this.playIntent && this.state.loading)) this.pause(); else void this.resume(); }
+  async reloadQuality() {
+    if (!this.current()) return;
+    await this.load(this.state.position, true);
+  }
   seek(value: number) {
     const seconds = Math.max(0, Math.min(value, this.state.duration)); this.lastPosition = seconds;
     if (this.native) void NativePlayer.seek({ seconds }).catch(() => this.failPlayback()); else this.audio.currentTime = seconds;
@@ -155,7 +225,7 @@ export class Player {
   private async syncNativeQueue() {
     if (!this.native || !this.current()) return;
     const api = new Invidious(this.library().settings);
-    await NativePlayer.upcoming({ tracks: this.state.queue.slice(this.state.index + 1).filter(track => track.musicVerified).map(track => ({ id: track.videoId, title: track.title, artist: track.author, url: api.stream(track.videoId, '140') })) });
+    await NativePlayer.upcoming({ tracks: this.state.queue.slice(this.state.index + 1).filter(track => track.musicVerified).map(track => ({ id: track.videoId, title: track.title, artist: track.author, url: api.stream(track.videoId, this.formats[this.sourceIndex]?.itag || (this.library().settings.audioQuality === 'high' ? '251' : this.library().settings.audioQuality === 'low' ? '249' : '140')) })) });
     await NativePlayer.repeat({ mode: this.state.repeat });
   }
   enqueue(track: Track) { this.update({ queue: [...this.state.queue, track] }); void this.syncNativeQueue().catch(() => this.failPlayback()); }
@@ -203,7 +273,7 @@ export class Player {
   }
   private async ended() { this.handlingEnd = true; try { await this.next(true); } finally { this.handlingEnd = false; } }
   stop() {
-    this.flush(); ++this.generation; this.controller?.abort(); this.sources = [];
+    this.flush(); ++this.generation; this.nativePreparing = false; this.playIntent = false; this.buffering?.abort(); this.controller?.abort(); this.sources = [];
     this.audio.pause(); this.audio.removeAttribute('src'); this.audio.load();
     if (this.native) void NativePlayer.stop().catch(() => {});
     this.sessionTrack = undefined; this.listened = 0;

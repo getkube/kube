@@ -14,6 +14,8 @@ export const artistSchema = z.object({ author: z.string().max(1000), authorId: z
 export const settingsSchema = z.object({
   instance: z.string().url().refine(x => { try { return new URL(x).protocol === 'https:' && new URL(x).origin === x; } catch { return false; } }),
   catalogProxy: z.string().default(''),
+  sidebarExpanded: z.boolean().default(false),
+  audioQuality: z.enum(['high','normal','low']).default('high'),
   region: z.string().regex(/^[A-Z]{2}$/),
   rememberHistory: z.boolean(), autoplay: z.boolean(), discovery: z.number().min(0).max(1),
   volume: z.number().min(0).max(1),
@@ -32,7 +34,7 @@ export type Settings = Library['settings'];
 export type Listen = Library['history'][number];
 export const defaultLibrary = (): Library => ({
   version: 1,
-  settings: { instance: import.meta.env.VITE_INVIDIOUS_INSTANCE || 'https://yt.chocolatemoo53.com', region: 'GB', catalogProxy: '', rememberHistory: true, autoplay: true, discovery: 0.35, volume: 0.8 },
+  settings: { instance: import.meta.env.VITE_INVIDIOUS_INSTANCE || 'https://yt.chocolatemoo53.com', region: 'GB', catalogProxy: '', sidebarExpanded: false, audioQuality: 'high', rememberHistory: true, autoplay: true, discovery: 0.35, volume: 0.8 },
   liked: [], hidden: [], artists: [], playlists: [], history: [],
 });
 export function tracksFrom(value: unknown): Track[] {

@@ -25,3 +25,14 @@ The React application builds for web, Android, Windows, macOS, and Linux.
 Release builds include update checking and downloads. Android installation requires
 system confirmation; macOS automatic installation requires Apple signing credentials.
 
+Accounts are optional. Sign up to sync your library across devices, or keep using
+Kube locally as a guest. Account passwords currently have no email recovery flow.
+
+Use the button at the bottom of the desktop sidebar to pin it open or closed.
+In the player's three-dot menu, **Audio quality** selects High (the best supported
+stream supplied by your Invidious instance), Normal, or Low. The setting is saved
+on this device. Public streams may offer lower bitrates than YouTube Music Premium.
+Playback buffers ten seconds before starting, or the full duration of a shorter
+track, then keeps loading ahead. Web and desktop preloading follows the browser
+engine's buffering policy; Android can buffer up to five minutes ahead.
+
