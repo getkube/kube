@@ -1,7 +1,7 @@
 import {test,expect} from '@playwright/test';
 
 test('expanded player preserves playback, manages queue, exposes tabs and updates the title',async({page})=>{
-  const tracks=['abcdefghijk','lmnopqrstuv'].map((videoId,index)=>({videoId,title:`Test song ${index+1}`,author:'Test artist',authorId:'artist',lengthSeconds:20,videoThumbnails:[],musicVerified:true,musicSource:'youtube-music'}));
+  const tracks=['abcdefghijk','lmnopqrstuv','wxyzabcdefg','hijklmnopqr'].map((videoId,index)=>({videoId,title:`Test song ${index+1}`,author:'Test artist',authorId:'artist',lengthSeconds:20,videoThumbnails:[],musicVerified:true,musicSource:'youtube-music'}));
   await page.addInitScript(liked=>localStorage.setItem('CapacitorStorage.kube.library.v1',JSON.stringify({version:1,liked,hidden:[],artists:[],history:[],playlists:[],settings:{instance:'https://music.test',region:'GB',catalogProxy:'',sidebarExpanded:false,audioQuality:'high',rememberHistory:false,autoplay:false,discovery:.35,volume:.8}})),tracks);
   const wav=Buffer.alloc(44+22050*2*20);wav.write('RIFF');wav.writeUInt32LE(wav.length-8,4);wav.write('WAVEfmt ',8);wav.writeUInt32LE(16,16);wav.writeUInt16LE(1,20);wav.writeUInt16LE(1,22);wav.writeUInt32LE(22050,24);wav.writeUInt32LE(44100,28);wav.writeUInt16LE(2,32);wav.writeUInt16LE(16,34);wav.write('data',36);wav.writeUInt32LE(wav.length-44,40);
   const metadata=new Map<string,number>();let resolutions=0;
@@ -22,10 +22,29 @@ test('expanded player preserves playback, manages queue, exposes tabs and update
   await page.getByRole('button',{name:'Play liked songs',exact:true}).click();
   await expect(page).toHaveTitle('Kube - [playing Test song 1]');
   await expect.poll(()=>metadata.get('lmnopqrstuv')).toBe(1);
+  await page.getByRole('button',{name:'Show queue',exact:true}).click();
+  const drag=async(from:string,to:string,scope='main')=>{const a=(await page.locator(scope).getByRole('button',{name:`Reorder ${from}`,exact:true}).boundingBox())!;const b=(await page.locator(scope).getByRole('button',{name:`Reorder ${to}`,exact:true}).boundingBox())!;await page.mouse.move(a.x+a.width/2,a.y+a.height/2);await page.mouse.down();await page.mouse.move(b.x+b.width/2,b.y+b.height/2,{steps:12});await page.waitForTimeout(100);await page.mouse.up();};
+  await drag('Test song 4','Test song 2');
+  await expect(page.locator('.queue-song strong')).toHaveText(['Test song 1','Test song 4','Test song 2','Test song 3']);
+  await page.getByRole('button',{name:'Reorder Test song 4',exact:true}).press('End');
+  await expect(page.locator('.queue-song strong')).toHaveText(tracks.map(t=>t.title));
+  const viewport=page.viewportSize()!;await page.setViewportSize({width:390,height:844});
+  const touch=await page.context().newCDPSession(page);await touch.send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});
+  const source=(await page.getByRole('button',{name:'Reorder Test song 4',exact:true}).boundingBox())!;
+  const target=(await page.getByRole('button',{name:'Reorder Test song 2',exact:true}).boundingBox())!;
+  await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:source.x+source.width/2,y:source.y+source.height/2}]});
+  for(let step=1;step<=10;step++)await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:target.x+target.width/2,y:source.y+source.height/2+(target.y+target.height/2-source.y-source.height/2)*step/10}]});
+  await page.waitForTimeout(100);await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+  await expect(page.locator('.queue-song strong')).toHaveText(['Test song 1','Test song 4','Test song 2','Test song 3']);
+  await page.getByRole('button',{name:'Reorder Test song 4',exact:true}).press('End');
+  await touch.send('Emulation.setTouchEmulationEnabled',{enabled:false});await touch.detach();await page.setViewportSize(viewport);
   await page.getByRole('button',{name:'Expand now playing'}).click();
   const dialog=page.getByRole('dialog',{name:'Now playing'});
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole('heading',{name:'Test song 1'})).toBeVisible();
+  await drag('Test song 4','Test song 3','dialog.now-playing-screen');
+  await expect(dialog.locator('.queue-song strong')).toHaveText(['Test song 1','Test song 2','Test song 4','Test song 3']);
+  await dialog.getByRole('button',{name:'Reorder Test song 4',exact:true}).press('End');
   await dialog.getByRole('tab',{name:'Lyrics',exact:true}).click();
   await expect(dialog.getByText('Lyrics are unavailable for this track right now.')).toBeVisible();
   await dialog.getByRole('tab',{name:'Related',exact:true}).click();

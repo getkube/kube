@@ -250,6 +250,11 @@ export class Player {
     const queue = [...this.state.queue]; [queue[index], queue[next]] = [queue[next], queue[index]]; this.update({ queue });
     void this.syncNativeQueue().catch(() => this.failPlayback());
   }
+  reorder(from: number, to: number) {
+    if (!Number.isInteger(from) || !Number.isInteger(to) || from<=this.state.index || to<=this.state.index || from>=this.state.queue.length || to>=this.state.queue.length || from===to) return;
+    const queue=[...this.state.queue];const [track]=queue.splice(from,1);queue.splice(to,0,track);
+    this.update({queue});this.prefetchNext();void this.syncNativeQueue().catch(()=>this.failPlayback());
+  }
   shuffle() {
     const past = this.state.queue.slice(0, this.state.index + 1), future = this.state.queue.slice(this.state.index + 1);
     for (let i = future.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [future[i], future[j]] = [future[j], future[i]]; }

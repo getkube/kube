@@ -2,6 +2,16 @@ import { afterEach, expect, it, vi } from 'vitest';
 import worker from '../cloudflare/worker';
 afterEach(() => vi.unstubAllGlobals());
 const request = (path: string, body = '{}') => new Request('https://kube.example' + path, { method: 'POST', body, headers: { 'Content-Type': 'application/json' } });
+it('restricts artist image relay hosts, redirects, and content types',async()=>{
+  const fetcher=vi.fn();vi.stubGlobal('fetch',fetcher);
+  expect((await worker.fetch(new Request('https://kube.example/catalog/image?url=https://example.com/a'))).status).toBe(400);
+  expect(fetcher).not.toHaveBeenCalled();
+  fetcher.mockResolvedValue(new Response('image',{headers:{'Content-Type':'image/webp'}}));
+  const result=await worker.fetch(new Request('https://kube.example/catalog/image?url='+encodeURIComponent('https://lh3.googleusercontent.com/photo')));
+  expect(await result.text()).toBe('image');expect(fetcher.mock.calls[0][1].redirect).toBe('manual');expect(result.headers.get('cache-control')).toContain('max-age');
+  fetcher.mockResolvedValue(new Response('<html/>',{headers:{'Content-Type':'text/html'}}));
+  expect((await worker.fetch(new Request('https://kube.example/catalog/image?url='+encodeURIComponent('https://lh3.googleusercontent.com/photo')))).status).toBe(502);
+});
 it('rejects arbitrary catalog routes and oversized bodies without contacting upstream', async () => {
   const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher);
   expect((await worker.fetch(request('/catalog/other'))).status).toBe(404);

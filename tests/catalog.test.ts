@@ -1,8 +1,12 @@
 
 import { expect, it, vi, afterEach } from 'vitest';
-import { catalogTracks } from '../src/catalog';
+import { catalogTracks, catalogArtists } from '../src/catalog';
 import { catalogFetch } from '../src/catalog-transport';
 afterEach(() => vi.unstubAllGlobals());
+it('maps artist identity and relays only approved profile image hosts',()=>{
+  const artists=catalogArtists({contents:[{item_type:'artist',id:'UC123',name:'Artist',thumbnails:[{url:'https://lh3.googleusercontent.com/photo'}]},{item_type:'artist',id:'UC999',name:'Other',thumbnails:[{url:'https://untrusted.test/photo'}]},{item_type:'song',id:'catalogsng1',title:'Song'}]});
+  expect(artists).toHaveLength(2);expect(artists[0].photo).toContain('https://kube.jamesd.uk/catalog/image?url=');expect(artists[1].photo).toBe('');
+});
 it('keeps catalog songs and music videos and excludes podcasts and ordinary results', () => {
   const rows = [
     { item_type:'song',id:'catalogsng1',title:'Song',artists:[{name:'Artist',channel_id:'UC123'}],duration:{seconds:200}},

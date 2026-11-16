@@ -1,4 +1,5 @@
 import { accounts, type AccountEnv } from './accounts';
+import { allowedArtistImage } from '../src/artist-images';
 const allowedRoutes = new Set(['/youtubei/v1/search', '/youtubei/v1/browse', '/youtubei/v1/next', '/youtubei/v1/player']);
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -13,6 +14,19 @@ export default {
     const url = new URL(request.url);
     if (url.pathname.startsWith('/api/')) return env ? accounts(request, env) : error('Account database unavailable',503);
     if (url.pathname === '/health') return Response.json({ status: 'ok', service: 'kube-web' });
+    if (url.pathname === '/catalog/image') {
+      if (request.method !== 'GET') return error('GET required',405);
+      const image = url.searchParams.get('url') || '';
+      if (!allowedArtistImage(image) || image.length > 3000) return error('Unsupported artist image',400);
+      try {
+        const response = await fetch(image,{redirect:'manual',signal:AbortSignal.timeout(12000)});
+        const type = response.headers.get('content-type') || '';
+        if (!response.ok || !/^image\/(jpeg|png|webp|avif)(;|$)/i.test(type)) { await response.body?.cancel(); return error('Image unavailable',502); }
+        let size = 0;
+        const body = response.body?.pipeThrough(new TransformStream<Uint8Array,Uint8Array>({transform(chunk,controller){size+=chunk.byteLength;if(size>2000000)throw new Error('Image too large');controller.enqueue(chunk);}}));
+        return new Response(body,{headers:{'Content-Type':type,'Cache-Control':'public, max-age=3600','Access-Control-Allow-Origin':'*','X-Content-Type-Options':'nosniff'}});
+      } catch { return error('Image unavailable',502); }
+    }
     const route = url.pathname.slice('/catalog'.length);
     if (!url.pathname.startsWith('/catalog/') || !allowedRoutes.has(route)) return error('Unknown catalog route', 404);
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });

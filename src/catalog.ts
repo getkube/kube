@@ -5,6 +5,25 @@ type Search = YTMusic.Search;
 type SearchContinuation = Awaited<ReturnType<Search['getContinuation']>>;
 import { catalogFetch } from './catalog-transport';
 import { trackSchema, uniqueTracks, type Track, type Settings } from './model';
+import { artistImage } from './artist-images';
+export type CatalogArtist = {author:string;authorId:string;photo:string;description:string};
+function photo(value: unknown): string {
+  const items = Array.isArray(value) ? value : record(value).contents;
+  if (!Array.isArray(items)) return '';
+  const url = [...items].reverse().map(item=>record(item).url).find(value=>typeof value==='string');
+  return typeof url === 'string' ? artistImage(url) : '';
+}
+export function catalogArtists(value:unknown): CatalogArtist[] {
+  const result = new Map<string,CatalogArtist>(); const seen = new Set<object>();
+  function visit(value:unknown) {
+    if(!value || typeof value!=='object' || seen.has(value))return;seen.add(value);
+    if(Array.isArray(value)){value.forEach(visit);return;}
+    const item=record(value);
+    if(['artist','library_artist'].includes(String(item.item_type)) && typeof item.id==='string') result.set(item.id,{author:text(item.name||item.title),authorId:item.id,photo:photo(item.thumbnails)||photo(item.thumbnail),description:text(item.subscribers)});
+    for(const key of ['sections','contents','items','content','results'])visit(item[key]);
+  }
+  visit(value);return [...result.values()];
+}
 
 type Row = Record<string, unknown>;
 const record = (value: unknown): Row => value && typeof value === 'object' ? value as Row : {};
@@ -53,10 +72,12 @@ export async function catalogSearch(settings: Settings, query: string, page = 1,
   const key = settings.region + settings.catalogProxy + query;
   const music = (await client(settings, signal)).music;
   let results: Results;
+  let artists: CatalogArtist[] = [];
   let activeSongs = true, activeVideos = true;
   if (page === 1) {
-    const [songs, videos] = await Promise.all([music.search(query, { type: 'song' }), music.search(query, { type: 'video' })]);
+    const [songs, videos, artistResults] = await Promise.all([music.search(query, { type: 'song' }), music.search(query, { type: 'video' }), music.search(query,{type:'artist'}).catch(()=>undefined)]);
     results = { songs, videos };
+    artists = catalogArtists(artistResults);
     if (pages.size > 30) pages.clear();
   } else {
     const previous = pages.get(key + ':' + (page - 1));
@@ -69,7 +90,7 @@ export async function catalogSearch(settings: Settings, query: string, page = 1,
   }
   signal?.throwIfAborted();
   pages.set(key + ':' + page, results);
-  return { tracks: catalogTracks([activeSongs ? results.songs : undefined, activeVideos ? results.videos : undefined]), hasMore: results.songs.has_continuation || results.videos.has_continuation, nextPage: page + 1 };
+  return { tracks: catalogTracks([activeSongs ? results.songs : undefined, activeVideos ? results.videos : undefined]), artists, hasMore: results.songs.has_continuation || results.videos.has_continuation, nextPage: page + 1 };
 }
 export async function catalogHome(settings: Settings, signal?: AbortSignal) {
   const music = (await client(settings, signal)).music;
@@ -86,11 +107,17 @@ export async function catalogHome(settings: Settings, signal?: AbortSignal) {
   signal?.throwIfAborted();
   return tracks;
 }
+const profiles = new Map<string,{expires:number;value:{tracks:Track[];continuation:undefined;profile:CatalogArtist}}>();
 export async function catalogArtist(settings: Settings, id: string, signal?: AbortSignal) {
+  const key=settings.region+settings.catalogProxy+id;const hit=profiles.get(key);if(hit&&hit.expires>Date.now())return hit.value;
   const artist = await (await client(settings, signal)).music.getArtist(id);
-  const tracks = catalogTracks([artist, await artist.getAllSongs()]);
+  let all;try{all=await artist.getAllSongs();}catch{signal?.throwIfAborted();}
+  const tracks = catalogTracks([artist, all]);
   signal?.throwIfAborted();
-  return { tracks, continuation: undefined };
+  const header=record(artist.header);
+  const value={tracks,continuation:undefined,profile:{author:text(header.title),authorId:id,photo:photo(header.foreground_thumbnail)||photo(header.thumbnail),description:text(header.description)}};
+  if(profiles.size>=30)profiles.delete(profiles.keys().next().value!);profiles.set(key,{value,expires:Date.now()+300000});
+  return value;
 }
 export async function catalogRelated(settings: Settings, id: string, signal?: AbortSignal) {
   const info = await (await client(settings, signal)).music.getInfo(id);
