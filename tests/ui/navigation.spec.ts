@@ -107,3 +107,29 @@ test('mobile header aligns search and keeps navigation reachable at phone sizes'
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   }
 });
+
+test('mobile cutout insets apply once and release space when system bars hide', async ({page}) => {
+  await page.setViewportSize({width:390,height:844});
+  await page.goto('/',{waitUntil:'domcontentloaded'});
+  const bounds = async () => ({
+    logo: (await page.locator('.mobile-brand img').boundingBox())!,
+    search: (await page.locator('.search-box').boundingBox())!,
+    player: (await page.locator('.player-bar').boundingBox())!,
+    nav: (await page.getByRole('navigation',{name:'Mobile navigation'}).boundingBox())!,
+  });
+  const base = await bounds();
+  await page.evaluate(() => {
+    document.documentElement.style.setProperty('--safe-area-inset-top','30px');
+    document.documentElement.style.setProperty('--safe-area-inset-bottom','24px');
+  });
+  const cutout = await bounds();
+  expect(cutout.logo.y-base.logo.y).toBe(30);
+  expect(cutout.search.y-base.search.y).toBe(30);
+  expect(base.player.y-cutout.player.y).toBe(24);
+  expect(cutout.nav.y+cutout.nav.height).toBe(844);
+  await page.evaluate(() => {
+    document.documentElement.style.setProperty('--safe-area-inset-top','0px');
+    document.documentElement.style.setProperty('--safe-area-inset-bottom','0px');
+  });
+  expect(await bounds()).toEqual(base);
+});

@@ -7,6 +7,8 @@ release/
 *.log
 android/.gradle/
 android/local.properties
+android/capacitor.settings.gradle
+android/app/capacitor.build.gradle
 android/**/build/
 android/.idea/
 test-results/

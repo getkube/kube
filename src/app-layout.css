@@ -19,7 +19,7 @@
 .topbar, .player-bar, .settings-card, .library-shortcuts button, .library-card, .mobile-nav { background: #212121; border-color: #393939; }
 .search-box { background: #191919; border-color: #474747; }
 .drawer-trigger { display: none; }
-.kube-drawer { margin: 0; width: min(330px,88vw); max-width: none; height: 100dvh; max-height: none; border-radius: 0 16px 16px 0; padding: max(20px,env(safe-area-inset-top)) 14px; background: #202020; }
+.kube-drawer { margin: 0; width: min(330px,88vw); max-width: none; height: 100dvh; max-height: none; border-radius: 0 16px 16px 0; padding: max(20px,var(--safe-top)) 14px; background: #202020; }
 .kube-drawer[open] { animation: drawer-in .18s ease-out; }
 @keyframes drawer-in { from { transform: translateX(-100%); } }
 @media(prefers-reduced-motion:reduce) { .kube-drawer[open] { animation: none; } }
@@ -28,7 +28,7 @@
 .drawer-heading button { margin-left: auto; }
 @media(max-width:560px) {
   .kube-rail { display: none; }
-  .drawer-trigger { display: grid; position: absolute; left: 8px; top: calc(14px + env(safe-area-inset-top)); width: 44px; height: 44px; padding: 0; z-index: 3; }
+  .drawer-trigger { display: grid; position: absolute; left: 8px; top: calc(14px + var(--safe-top)); width: 44px; height: 44px; padding: 0; z-index: 3; }
   .topbar { padding-left: 60px; }
   .mobile-brand { display: none; }
   .topbar .search-box input { font-size: 16px; }
@@ -39,7 +39,7 @@
   .queue-item .track-copy { min-width: 40%; }
   .track-copy { min-width: 0; }
   .listen-heading { flex-wrap: wrap; }
-  .app-shell { padding-bottom: calc(162px + env(safe-area-inset-bottom)); }
+  .app-shell { padding-bottom: calc(162px + var(--safe-bottom)); }
 }
 
 .window-controls { display: flex; flex: none; align-items: center; border-left: 1px solid #393939; padding-left: 6px; }
@@ -73,8 +73,8 @@
  .transport-buttons>.primary-play { min-width:44px; height:44px; }
  .player-bar .seek span { display: none; }
  .player-extras>.icon-button { min-width:44px; min-height:44px; }
- .app-shell { padding-bottom:calc(128px + env(safe-area-inset-bottom)); }
- .toast,.update-notice { bottom:calc(140px + env(safe-area-inset-bottom)); }
+ .app-shell { padding-bottom:calc(128px + var(--safe-bottom)); }
+ .toast,.update-notice { bottom:calc(140px + var(--safe-bottom)); }
 }
 
 .account-button { flex: none; min-height: 42px; padding: 10px 14px; background: #333; border-color: #444; }
