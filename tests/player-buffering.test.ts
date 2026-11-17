@@ -24,6 +24,18 @@ class TestAudio extends EventTarget {
 const track = (id: string): Track => ({videoId:id,title:id,author:'Artist',authorId:'artist',lengthSeconds:30,videoThumbnails:[],musicVerified:true,musicSource:'youtube-music'});
 const settle = async () => { for(let i=0;i<8;i++) await Promise.resolve(); };
 afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers(); });
+it('returns fades to the selected volume and ignores excluded listens',async()=>{
+  vi.useFakeTimers();vi.stubGlobal('Audio',TestAudio);vi.stubGlobal('navigator',{});
+  const library=defaultLibrary();const record=vi.fn();const player=new Player(()=>library,record);
+  try{
+    const started=player.play(track('abcdefghijk'));await settle();TestAudio.last.buffer(10);await started;
+    await vi.advanceTimersByTimeAsync(300);expect(TestAudio.last.volume).toBeCloseTo(.8);
+    library.settings.volume=.25;player.volume(.25);player.pause();await vi.advanceTimersByTimeAsync(100);
+    await player.resume();await vi.advanceTimersByTimeAsync(300);expect(TestAudio.last.volume).toBeCloseTo(.25);
+    for(let i=1;i<=5;i++){TestAudio.last.currentTime=i;TestAudio.last.dispatchEvent(new Event('timeupdate'));}
+    library.tasteExcludedTracks=[{id:'abcdefghijk',title:'Song'}];player.pause();await vi.advanceTimersByTimeAsync(300);expect(record).not.toHaveBeenCalled();
+  }finally{player.destroy();}
+});
 
 it('pausing during startup prevents delayed playback; a new track replaces the pending buffer', async () => {
   vi.stubGlobal('Audio', TestAudio); vi.stubGlobal('navigator', {});

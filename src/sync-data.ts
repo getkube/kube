@@ -10,6 +10,8 @@ export function flattenLibrary(library: Library) {
   };
   const track = (value: Library["liked"][number]) =>
     trackSchema.parse({ ...value, videoThumbnails: [] });
+  library.tasteExcludedTracks.forEach(t=>add("tasteExcludedTracks",t.id,t));
+  library.tasteExcludedArtists.forEach(a=>add("tasteExcludedArtists",a.key,a));
   library.liked.forEach((t) => add("liked", t.videoId, track(t)));
   library.hidden.forEach((id) => add("hidden", id, true));
   library.artists.forEach((a) => add("artists", a.authorId, a));
@@ -52,6 +54,8 @@ export function restoreSyncedLibrary(
   return librarySchema.parse({
     ...local,
     liked: values("liked"),
+    tasteExcludedTracks: values("tasteExcludedTracks"),
+    tasteExcludedArtists: values("tasteExcludedArtists"),
     hidden: Array.from(items.values())
       .filter((i) => i.kind === "hidden" && i.value !== null)
       .map((i) => i.id),

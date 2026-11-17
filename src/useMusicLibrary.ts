@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Invidious } from './api';
-import { uniqueTracks, type Library, type Track } from './model';
+import { uniqueTracks, learnsFrom, type Library, type Track } from './model';
 import { mapMusicPage } from './music';
 
 export function useMusicLibrary(stored: Library, update: (fn: (old: Library) => Library) => void) {
@@ -27,6 +27,6 @@ export function useMusicLibrary(stored: Library, update: (fn: (old: Library) => 
     void migrate().catch(() => {});
     return () => controller.abort();
   }, [ids, stored.settings.instance, stored.settings.region]);
-  return { ...stored, liked: stored.liked.filter(t => t.musicSource === 'youtube-music'), history: stored.history.filter(h => h.track.musicSource === 'youtube-music'),
+  return { ...stored, liked: stored.liked.filter(t => t.musicSource === 'youtube-music'), history: stored.history.filter(h => h.track.musicSource === 'youtube-music' && learnsFrom(h.track,stored)),
     playlists: stored.playlists.map(p => ({ ...p, tracks: p.tracks.filter(t => t.musicSource === 'youtube-music') })) };
 }

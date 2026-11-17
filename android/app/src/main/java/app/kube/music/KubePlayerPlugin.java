@@ -38,9 +38,10 @@ public class KubePlayerPlugin extends Plugin {
     private void cancelFade() { if (fade != null) { fade.removeAllListeners(); fade.cancel(); fade = null; } }
     private void fadeTo(float target, boolean pauseAfter) {
         cancelFade();
-        fade = ValueAnimator.ofFloat(controller.getVolume(), target);
+        final float startVolume = controller.getVolume();
+        fade = ValueAnimator.ofFloat(0f, 1f);
         fade.setDuration(250);
-        fade.addUpdateListener(value -> controller.setVolume((float)value.getAnimatedValue()));
+        fade.addUpdateListener(value -> controller.setVolume(startVolume + ((pauseAfter ? 0f : desiredVolume) - startVolume) * (float)value.getAnimatedValue()));
         fade.addListener(new AnimatorListenerAdapter() { @Override public void onAnimationEnd(Animator animation) { if (pauseAfter) { controller.pause(); controller.setVolume(desiredVolume); } fade = null; } });
         fade.start();
     }
@@ -64,7 +65,7 @@ public class KubePlayerPlugin extends Plugin {
     }
     @PluginMethod public void play(PluginCall call) {
         withPlayer(call, () -> {
-            cancelFade(); fadeOnPlay = !call.getBoolean("paused", false); controller.setVolume(fadeOnPlay ? 0f : desiredVolume);
+            cancelFade(); desiredVolume = (float)Math.max(0, Math.min(1, call.getDouble("volume", (double)desiredVolume))); fadeOnPlay = !call.getBoolean("paused", false); controller.setVolume(fadeOnPlay ? 0f : desiredVolume);
             controller.setMediaItem(item(call.getString("url", ""), call.getString("title", ""), call.getString("artist", ""), call.getString("id", "")), (long)(Math.max(0, call.getDouble("position", 0.0)) * 1000));
             controller.prepare(); controller.setPlayWhenReady(!call.getBoolean("paused", false)); call.resolve();
         });

@@ -7,6 +7,7 @@ import {Cover,IconButton} from './components';
 export function QueueList({onAdd}:{onAdd:(track:Track)=>void}) {
   const {player}=useApp();const state=useSyncExternalStore(player.subscribe,player.snapshot);
   const [menu,setMenu]=useState<number|null>(null);
+  const [visible,setVisible]=useState(24);
   const root=useRef<HTMLDivElement>(null);
   const drag=useRef<{from:number;to:number;y:number;start:number;active:boolean;scroll:HTMLElement;frame:number}|null>(null);
   const [marker,setMarker]=useState<number|null>(null),[announcement,announce]=useState('');
@@ -25,7 +26,7 @@ export function QueueList({onAdd}:{onAdd:(track:Track)=>void}) {
     }
     current.frame=requestAnimationFrame(frame);
   }
-  return <div className="sortable-queue" ref={root}><p className="queue-hint">Drag upcoming tracks to reorder. Use arrow keys on a handle with a keyboard.</p><span className="sr-only" role="status">{announcement}</span>{state.queue.map((track,index)=><div data-queue-index={index} className={`sortable-row ${index===state.index?'current':''} ${marker===index?'drop-target':''}`} key={`${track.videoId}-${index}`}>
+  return <div className="sortable-queue" ref={root}><p className="queue-hint">Drag upcoming tracks to reorder. Use arrow keys on a handle with a keyboard.</p><span className="sr-only" role="status">{announcement}</span>{state.queue.slice(0,Math.max(visible,state.index+1)).map((track,index)=><div data-queue-index={index} className={`sortable-row ${index===state.index?'current':''} ${marker===index?'drop-target':''}`} key={`${track.videoId}-${index}`}>
     <button className="queue-grip" aria-label={`Reorder ${track.title}`} title="Drag to reorder; arrow keys to move" disabled={index<=state.index}
       onPointerDown={event=>{if(event.button!==0||index<=state.index)return;event.preventDefault();cancel();let scroll=root.current!.parentElement!;while(scroll.parentElement&&scroll.scrollHeight<=scroll.clientHeight)scroll=scroll.parentElement;drag.current={from:index,to:index,y:event.clientY,start:event.clientY,active:false,scroll,frame:0};event.currentTarget.setPointerCapture(event.pointerId);drag.current.frame=requestAnimationFrame(frame);}}
       onPointerMove={event=>{if(drag.current){drag.current.y=event.clientY;if(Math.abs(event.clientY-drag.current.start)>5)drag.current.active=true;}}}
@@ -35,5 +36,5 @@ export function QueueList({onAdd}:{onAdd:(track:Track)=>void}) {
     <button className="queue-song" aria-label={`Play queue song ${index+1}: ${track.title}`} aria-current={index===state.index?'true':undefined} onClick={()=>void player.play(track,state.queue)}><Cover track={track}/><span><strong>{track.title}</strong><small>{track.author}</small></span>{index===state.index&&<small className="queue-now">Now playing</small>}</button>
     <div className="menu-wrap"><IconButton label={`Options for queued ${track.title}`} onClick={()=>setMenu(menu===index?null:index)}><MoreHorizontal size={19}/></IconButton>{menu===index&&<><button className="menu-dismiss" aria-label="Close queue options" onClick={()=>setMenu(null)}/><div className="track-menu" role="menu"><button role="menuitem" onClick={()=>{setMenu(null);onAdd(track);}}>Add to playlist</button></div></>}</div>
     <IconButton label={`Remove queue song ${index+1}`} disabled={index===state.index} onClick={()=>player.remove(index)}><X size={17}/></IconButton>
-  </div>)}</div>;
+  </div>)}<div className="track-pagination">{visible<state.queue.length&&<button onClick={()=>setVisible(n=>n+24)}>Show more</button>}{visible>24&&<button onClick={()=>setVisible(24)}>Show less</button>}</div></div>;
 }

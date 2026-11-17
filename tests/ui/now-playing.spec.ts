@@ -77,4 +77,13 @@ test('expanded player preserves playback, manages queue, exposes tabs and update
   await picker.getByRole('button',{name:'Queued songs',exact:true}).click();
   const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('CapacitorStorage.kube.library.v1')!).playlists[0].tracks.map((t:{videoId:string})=>t.videoId));
   expect(saved).toEqual(['lmnopqrstuv','wxyzabcdefg']);
+  await page.getByRole('button',{name:'Player options',exact:true}).click();
+  await page.getByRole('menuitem',{name:"Don't use this song for my taste",exact:true}).click();
+  await page.getByRole('button',{name:'Player options',exact:true}).click();
+  await page.getByRole('menuitem',{name:"Don't use this artist for my taste",exact:true}).click();
+  let taste=await page.evaluate(()=>JSON.parse(localStorage.getItem('CapacitorStorage.kube.library.v1')!));
+  expect(taste.tasteExcludedTracks[0].id).toBe('lmnopqrstuv');expect(taste.tasteExcludedArtists[0].key).toBe('artist');
+  await page.locator('.account-button').click();await expect(page.getByRole('heading',{name:'Account settings',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Allow song again',exact:true}).click();
+  taste=await page.evaluate(()=>JSON.parse(localStorage.getItem('CapacitorStorage.kube.library.v1')!));expect(taste.tasteExcludedTracks).toHaveLength(0);
 });

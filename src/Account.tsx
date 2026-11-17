@@ -1,3 +1,4 @@
+import { AccountPreferences } from './AccountPreferences';
 import { useState, useSyncExternalStore, type FormEvent } from "react";
 import {
   ArrowLeft,
@@ -26,7 +27,7 @@ export function AccountButton({ open }: { open: () => void }) {
     </button>
   );
 }
-export function AccountPage({ back }: { back: () => void }) {
+export function AccountPage({ back,openSettings }: { back: () => void;openSettings:()=>void }) {
   const account = useSyncExternalStore(
     accountStore.subscribe,
     accountStore.snapshot,
@@ -218,6 +219,7 @@ export function AccountPage({ back }: { back: () => void }) {
           )}
         </div>
       </div>
+      <AccountPreferences openSettings={openSettings}/>
     </section>
   );
 }

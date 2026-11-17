@@ -1,4 +1,4 @@
-import { artistKey, uniqueTracks, type Library, type Track } from './model';
+import { learnsFrom, artistKey, uniqueTracks, type Library, type Track } from './model';
 import type { Invidious } from './api';
 export type Recommendation = { track: Track; reason: string; score: number };
 const tokens = (text: string) => new Set(text.toLowerCase().replace(/\b(official|video|audio|music|lyrics|hd|4k|feat)\b/g, '').match(/[\p{L}\p{N}]{3,}/gu) || []);
@@ -6,14 +6,14 @@ export function rankRecommendations(candidates: Track[], library: Library, relat
   const affinities = new Map<string, number>();
   const words = new Map<string, number>();
   const recentlyPlayed = new Map<string, number>();
-  const liked = new Set(library.liked.map(t => t.videoId));
+  const liked = new Set(library.liked.filter(t=>learnsFrom(t,library)).map(t => t.videoId));
   const hidden = new Set(library.hidden);
-  const followed = new Set(library.artists.map(artistKey));
-  for (const t of library.liked) {
+  const followed = new Set(library.artists.filter(a=>!library.tasteExcludedArtists.some(x=>x.key===artistKey(a))).map(artistKey));
+  for (const t of library.liked.filter(t=>learnsFrom(t,library))) {
     affinities.set(artistKey(t), (affinities.get(artistKey(t)) || 0) + 3);
     for (const token of tokens(t.title)) words.set(token, (words.get(token) || 0) + 1);
   }
-  for (const h of library.history) {
+  for (const h of library.history.filter(h=>learnsFrom(h.track,library))) {
     const age = Math.max(0, (now - h.at) / 86_400_000);
     const decay = Math.exp(-age / 21);
     const fraction = h.track.lengthSeconds ? Math.min(h.seconds / h.track.lengthSeconds, 1) : Math.min(h.seconds / 180, 1);
@@ -47,15 +47,15 @@ export function rankRecommendations(candidates: Track[], library: Library, relat
   return result;
 }
 export async function recommendations(api: Invidious, library: Library, signal?: AbortSignal) {
-  const seeds = uniqueTracks([...library.history.filter(h => h.seconds >= 30).slice(0, 10).map(h => h.track), ...library.liked]).slice(0, 3);
+  const seeds = uniqueTracks([...library.history.filter(h => h.seconds >= 30 && learnsFrom(h.track,library)).slice(0, 10).map(h => h.track), ...library.liked.filter(t=>learnsFrom(t,library))]).slice(0, 3);
   const relatedIds = new Set<string>();
   const requests: Promise<Track[]>[] = [api.trending(signal)];
   for (const seed of seeds) requests.push(api.related(seed.videoId, signal).then(tracks => { tracks.forEach(t => relatedIds.add(t.videoId)); return tracks; }));
-  for (const artist of library.artists.slice(0, 2)) requests.push(api.channel(artist.authorId, undefined, signal).then(d => d.tracks));
+  for (const artist of library.artists.filter(a=>!library.tasteExcludedArtists.some(x=>x.key===artistKey(a))).slice(0, 2)) requests.push(api.channel(artist.authorId, undefined, signal).then(d => d.tracks));
   const results = await Promise.allSettled(requests);
   const tracks = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
   if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
-  if (!tracks.length) tracks.push(...uniqueTracks([...library.liked, ...library.history.map(h => h.track)]).filter(t => t.musicVerified));
+  if (!tracks.length) tracks.push(...uniqueTracks([...library.liked, ...library.history.filter(h=>learnsFrom(h.track,library)).map(h => h.track)]).filter(t => t.musicVerified && learnsFrom(t,library)));
   if (!tracks.length) throw new Error('Could not load music from this instance. Check the connection in Settings or try searching.');
   return { items: rankRecommendations(tracks, library, relatedIds), partial: results.some(r => r.status === 'rejected') };
 }

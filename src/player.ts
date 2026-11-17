@@ -3,7 +3,7 @@ import { Capacitor } from '@capacitor/core';
 import { Invidious } from './api';
 import { NativePlayer } from './native';
 import { rankRecommendations } from './recommendations';
-import { type Library, type Listen, type Track, uniqueTracks } from './model';
+import { type Library, type Listen, type Track, uniqueTracks, learnsFrom } from './model';
 
 export type PlayerState = {
   buffered: number; bufferTarget: number; qualityLabel: string;
@@ -19,6 +19,7 @@ export class Player {
   private controller?: AbortController;
   private prefetch?: AbortController;
   private listened = 0;
+  private learning = true;
   private started = 0;
   private lastPosition = 0;
   private savedAt = 0;
@@ -33,7 +34,7 @@ export class Player {
   private cancelFade() { clearInterval(this.fadeTimer); this.fadeTimer=undefined; }
   private fadeTo(target:number,done?:()=>void) {
     this.cancelFade(); const from=this.audio.volume, start=performance.now();
-    this.fadeTimer=setInterval(()=>{const fraction=Math.min(1,(performance.now()-start)/250);this.audio.volume=from+(target-from)*fraction;if(fraction===1){this.cancelFade();done?.();}},16);
+    this.fadeTimer=setInterval(()=>{const fraction=Math.min(1,(performance.now()-start)/250);const end=target===0?0:this.library().settings.volume;this.audio.volume=from+(end-from)*fraction;if(fraction===1){this.cancelFade();done?.();}},16);
   }
   private playIntent = false;
   private startPosition = 0;
@@ -69,8 +70,10 @@ export class Player {
     if ('mediaSession' in navigator && !this.native) navigator.mediaSession.playbackState = this.state.playing ? 'playing' : 'paused';
   }
   private progress(position: number, duration: number) {
+    const eligible = this.current() ? learnsFrom(this.current(),this.library()) : false;
+    if (eligible!==this.learning) { this.listened=0;this.savedAt=0;this.started=Date.now();this.learning=eligible; }
     const delta = position - this.lastPosition;
-    if (this.state.playing && delta > 0 && delta < 3) this.listened += delta;
+    if (eligible && this.state.playing && delta > 0 && delta < 3) this.listened += delta;
     this.lastPosition = position;
     this.update({ position, duration: Number.isFinite(duration) && duration > 0 ? duration : this.current()?.lengthSeconds || 0 });
     if (this.listened - this.savedAt >= 30) { this.flush(); this.savedAt = this.listened; }
@@ -96,7 +99,7 @@ export class Player {
   }
   private flush(completed = false) {
     const track = this.sessionTrack;
-    if (track && this.listened >= 3 && this.library().settings.rememberHistory) this.record({ track, at: this.started, seconds: Math.round(this.listened), completed });
+    if (track && learnsFrom(track,this.library()) && this.listened >= 3 && this.library().settings.rememberHistory) this.record({ track, at: this.started, seconds: Math.round(this.listened), completed });
   }
   async play(track: Track, queue: Track[] = [track]) {
     this.flush();
@@ -145,7 +148,7 @@ export class Player {
     this.update({ qualityLabel: formatLabel(this.formats[this.sourceIndex]), loading: this.playIntent, buffered: 0 });
     if (this.native) {
       this.nativePreparing = true;
-      await NativePlayer.play({ url: this.sources[this.sourceIndex], title: track.title, artist: track.author, id: track.videoId, position: this.startPosition, paused: !this.playIntent });
+      await NativePlayer.play({ url: this.sources[this.sourceIndex], title: track.title, artist: track.author, id: track.videoId, position: this.startPosition, paused: !this.playIntent, volume: this.library().settings.volume });
       if (generation !== this.generation) return;
       this.nativePreparing = false;
       await NativePlayer.volume({ value: this.library().settings.volume });

@@ -23,6 +23,8 @@ export const settingsSchema = z.object({
 export const librarySchema = z.object({
   version: z.literal(1),
   settings: settingsSchema,
+  tasteExcludedTracks: z.array(z.object({id:z.string().regex(/^[\w-]{11}$/),title:z.string().max(2000)})).max(20000).default([]),
+  tasteExcludedArtists: z.array(z.object({key:z.string().max(200),name:z.string().max(1000)})).max(5000).default([]),
   liked: z.array(trackSchema).max(20000),
   hidden: z.array(z.string()).max(20000),
   artists: z.array(artistSchema).max(5000),
@@ -35,6 +37,7 @@ export type Listen = Library['history'][number];
 export const defaultLibrary = (): Library => ({
   version: 1,
   settings: { instance: import.meta.env.VITE_INVIDIOUS_INSTANCE || 'https://yt.chocolatemoo53.com', region: 'GB', catalogProxy: '', sidebarExpanded: false, audioQuality: 'high', rememberHistory: true, autoplay: true, discovery: 0.35, volume: 0.8 },
+  tasteExcludedTracks: [], tasteExcludedArtists: [],
   liked: [], hidden: [], artists: [], playlists: [], history: [],
 });
 export function tracksFrom(value: unknown): Track[] {
@@ -47,3 +50,5 @@ export function duration(seconds: number) {
   return `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
 }
 export function artistKey(track: Pick<Track, 'author' | 'authorId'>) { return track.authorId || track.author.toLocaleLowerCase(); }
+
+export function learnsFrom(track: Track, library: Library) { return !library.tasteExcludedTracks.some(t=>t.id===track.videoId) && !library.tasteExcludedArtists.some(a=>a.key===artistKey(track)); }

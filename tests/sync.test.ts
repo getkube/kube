@@ -6,11 +6,13 @@ it('round-trips playlists, songs and history while keeping connection settings l
  const library=defaultLibrary();
  library.liked=[track];library.playlists=[{id:'mix',name:'My mix',created:1,tracks:[track]}];
  library.history=[{track,at:10,seconds:50,completed:false}];
+ library.tasteExcludedTracks=[{id:track.videoId,title:track.title}];library.tasteExcludedArtists=[{key:'artist',name:'Artist'}];
  const device=defaultLibrary();device.settings.volume=.2;
  const restored=restoreSyncedLibrary(device,flattenLibrary(library));
  expect(restored.liked).toEqual([track]);
  expect(restored.playlists).toEqual(library.playlists);
  expect(restored.history).toEqual(library.history);
+ expect(restored.tasteExcludedTracks).toEqual(library.tasteExcludedTracks);expect(restored.tasteExcludedArtists).toEqual(library.tasteExcludedArtists);
  expect(restored.settings.volume).toBe(.2);
 });
 it('keeps deletion markers and removes a deleted song from another device',()=>{

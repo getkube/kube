@@ -30,6 +30,8 @@ const mutation = z.object({
     "playlists",
     "playlistTracks",
     "history",
+    "tasteExcludedTracks",
+    "tasteExcludedArtists",
   ]),
   id: z.string().min(1).max(300),
   value: z
