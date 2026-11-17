@@ -7,6 +7,7 @@ test('desktop search, account, and window controls share one top row',async({pag
     const bounds=await Promise.all(['.search-box','.account-button','.window-controls'].map(selector=>page.locator(selector).boundingBox()));
     const centers=bounds.map(box=>box!.y+box!.height/2);expect(Math.max(...centers)-Math.min(...centers)).toBeLessThan(2);
     expect(bounds[2]!.x+bounds[2]!.width).toBe(width);expect(bounds[2]!.y).toBe(0);
+    expect(bounds[2]!.x-(bounds[1]!.x+bounds[1]!.width)).toBeLessThanOrEqual(14);
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   }
 });

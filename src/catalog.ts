@@ -28,6 +28,8 @@ export function catalogArtists(value:unknown): CatalogArtist[] {
 type Row = Record<string, unknown>;
 const record = (value: unknown): Row => value && typeof value === 'object' ? value as Row : {};
 const musicIds = new Set<string>();
+const credits = new Map<string,{author:string;authorId:string}[]>();
+const creditRequests = new Map<string,Promise<{author:string;authorId:string}[]>>();
 const sessions = new Map<string, Promise<Innertube>>();
 async function client(settings: Settings, signal?: AbortSignal) {
   signal?.throwIfAborted();
@@ -57,14 +59,25 @@ export function catalogTracks(value: unknown): Track[] {
       const artists = Array.isArray(item.artists) ? item.artists.map(record) : [];
       const author = record(item.author);
       const parsed = trackSchema.safeParse({ videoId: id, title: text(item.title), author: artists.map(a => text(a.name)).join(', ') || text(author.name || item.author),
+        artists: artists.length ? artists.map(a=>({author:text(a.name),authorId:text(a.channel_id)})).filter(a=>a.author) : undefined,
         authorId: artists[0]?.channel_id || author.channel_id || '', lengthSeconds: Number(record(item.duration).seconds) || 0,
         videoThumbnails: [], musicVerified: true, musicSource: 'youtube-music' });
-      if (parsed.success) { found.push(parsed.data); musicIds.add(parsed.data.videoId); }
+      if (parsed.success) { found.push(parsed.data); musicIds.add(parsed.data.videoId); if(parsed.data.artists?.length){if(credits.size>500)credits.delete(credits.keys().next().value!);credits.set(parsed.data.videoId,parsed.data.artists);} }
     }
     for (const key of ['sections','contents','items','content','primary_renderer','songs']) visit(item[key]);
   }
   visit(value);
   return uniqueTracks(found);
+}
+export async function catalogCredits(settings:Settings,track:Track){
+  if(track.artists?.length)return track.artists;
+  const hit=credits.get(track.videoId);if(hit)return hit;
+  const key=settings.region+settings.catalogProxy+track.videoId;
+  if(!creditRequests.has(key)){
+    const request=(async()=>{const music=(await client(settings)).music;const pages=await Promise.allSettled([music.search(track.title,{type:'song'}),music.search(track.title,{type:'video'})]);for(const page of pages)if(page.status==='fulfilled')catalogTracks(page.value);return credits.get(track.videoId)||[];})();
+    if(creditRequests.size>100)creditRequests.delete(creditRequests.keys().next().value!);creditRequests.set(key,request);void request.then(value=>{if(!value.length)creditRequests.delete(key);},()=>creditRequests.delete(key));
+  }
+  return creditRequests.get(key)!;
 }
 type Results = { songs: Search | SearchContinuation; videos: Search | SearchContinuation };
 const pages = new Map<string, Results>();

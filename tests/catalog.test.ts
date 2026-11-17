@@ -3,6 +3,10 @@ import { expect, it, vi, afterEach } from 'vitest';
 import { catalogTracks, catalogArtists } from '../src/catalog';
 import { catalogFetch } from '../src/catalog-transport';
 afterEach(() => vi.unstubAllGlobals());
+it('preserves separate collaborator identities, including names containing commas',()=>{
+  const result=catalogTracks([{item_type:'song',id:'abcdefghijk',title:'Collaboration',artists:[{name:'Earth, Wind & Fire',channel_id:'UCband'},{name:'Guest',channel_id:'UCguest'}]}]);
+  expect(result[0].artists).toEqual([{author:'Earth, Wind & Fire',authorId:'UCband'},{author:'Guest',authorId:'UCguest'}]);
+});
 it('maps artist identity and relays only approved profile image hosts',()=>{
   const artists=catalogArtists({contents:[{item_type:'artist',id:'UC123',name:'Artist',thumbnails:[{url:'https://lh3.googleusercontent.com/photo'}]},{item_type:'artist',id:'UC999',name:'Other',thumbnails:[{url:'https://untrusted.test/photo'}]},{item_type:'song',id:'catalogsng1',title:'Song'}]});
   expect(artists).toHaveLength(2);expect(artists[0].photo).toContain('https://kube.jamesd.uk/catalog/image?url=');expect(artists[1].photo).toBe('');
