@@ -1,3 +1,4 @@
+import { VoiceSearch } from './VoiceSearch';
 import { QueueList } from './QueueList';
 import { ArtistCard, ArtistPhoto } from './ArtistCard';
 import { type CatalogArtist } from './catalog';
@@ -6,7 +7,7 @@ import { usePlaybackTitle } from './playback-title';
 import { AccountButton, AccountPage } from './Account';
 import { DesktopWindow } from './DesktopWindow';
 import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from 'react';
-import { Search, Home, Library, Heart, Clock3, Users, Settings as SettingsIcon, Plus, ArrowRight, Play, RefreshCw, ListMusic, Trash2, ArrowUp, ArrowDown, X, Music2, Check, Pencil } from 'lucide-react';
+import { Search, Mic, Home, Library, Heart, Clock3, Users, Settings as SettingsIcon, Plus, ArrowRight, Play, RefreshCw, ListMusic, Trash2, ArrowUp, ArrowDown, X, Music2, Check, Pencil } from 'lucide-react';
 import { useApp } from './context';
 import { Invidious } from './api';
 import { recommendations, rankRecommendations, type Recommendation } from './recommendations';
@@ -22,6 +23,7 @@ export function App() {
   const { library: stored, update, player, notice, notify, storageWarning } = useApp();
   const library = useMusicLibrary(stored, update);
   const playback = useSyncExternalStore(player.subscribe, player.snapshot);
+  const [voiceOpen,setVoiceOpen]=useState(false);
   const [expandedPlayer,setExpandedPlayer] = useState(false);
   usePlaybackTitle(playback, player.current());
   const [view, setView] = useState<View>('home');
@@ -120,7 +122,7 @@ export function App() {
   const titles: Partial<Record<View, [string, string]>> = { search: [query ? `Results for “${query}”` : 'Search', 'Search for a song or artist.'], liked: ['Liked songs', `${library.liked.length} liked tracks.`], history: ['Recently played', 'Your listening history.'], artists: ['Your artists', 'Artists you follow.'], playlists: ['Your playlists', 'Saved on this device.'], queue: ['Up next', `${playback.queue.length} tracks in your listening session.`] };
   return <div className="app-shell">
     <Sidebar items={[...nav, { id: 'queue', title: 'Queue', icon: ListMusic }, { id: 'settings', title: 'Settings', icon: SettingsIcon }]} active={view} navigate={navigate} />
-    <div className="workspace"><header className="topbar" data-tauri-drag-region><button className="mobile-brand" aria-label="Kube home" onClick={() => navigate('home')}><img src="./logo.png" alt="" /><span>Kube</span></button><form className="search-box" onSubmit={e => { e.preventDefault(); doSearch(search); }}><Search size={19} /><input ref={searchRef} type="search" enterKeyHint="search" autoComplete="off" aria-label="Search music" placeholder="Search songs, artists, and more" value={search} maxLength={300} onChange={e => setSearch(e.target.value)} /><kbd>↵</kbd><button className="search-submit" type="submit" aria-label="Submit music search"><ArrowRight size={20}/></button></form><button className="connection-badge" onClick={() => navigate('settings')} title={library.settings.instance}><span className="connection-dot" /> Invidious <span className="connection-host">/ {new URL(library.settings.instance).hostname}</span></button><IconButton label="Show queue" active={view === 'queue'} onClick={() => navigate('queue')}><ListMusic size={20} /></IconButton><button className="mobile-settings icon-button" aria-label="Open settings" onClick={() => navigate('settings')}><SettingsIcon size={22}/></button><AccountButton open={() => navigate('account')} /><DesktopWindow /></header>
+    <div className="workspace"><header className="topbar" data-tauri-drag-region><button className="mobile-brand" aria-label="Kube home" onClick={() => navigate('home')}><img src="./logo.png" alt="" /><span>Kube</span></button><form className="search-box" onSubmit={e => { e.preventDefault(); doSearch(search); }}><Search size={19} /><input ref={searchRef} type="search" enterKeyHint="search" autoComplete="off" aria-label="Search music" placeholder="Search songs, artists, and more" value={search} maxLength={300} onChange={e => setSearch(e.target.value)} /><button className="voice-trigger" type="button" aria-label="Voice search" onClick={()=>setVoiceOpen(true)}><Mic size={19}/></button><kbd>↵</kbd><button className="search-submit" type="submit" aria-label="Submit music search"><ArrowRight size={20}/></button></form><button className="connection-badge" onClick={() => navigate('settings')} title={library.settings.instance}><span className="connection-dot" /> Invidious <span className="connection-host">/ {new URL(library.settings.instance).hostname}</span></button><IconButton label="Show queue" active={view === 'queue'} onClick={() => navigate('queue')}><ListMusic size={20} /></IconButton><button className="mobile-settings icon-button" aria-label="Open settings" onClick={() => navigate('settings')}><SettingsIcon size={22}/></button><AccountButton open={() => navigate('account')} /><DesktopWindow /></header>
     <main ref={mainRef}>
       {view === 'playlists' && <nav className="mobile-library-links" aria-label="Your library"><button onClick={() => navigate('liked')}><Heart size={18}/>Liked songs</button><button onClick={() => navigate('artists')}><Users size={18}/>Artists</button><button onClick={() => navigate('history')}><Clock3 size={18}/>History</button></nav>}
       {storageWarning && <Failure message={storageWarning} />}
@@ -153,6 +155,7 @@ export function App() {
     <nav className="mobile-nav" aria-label="Mobile navigation">{[{ id: 'home' as View, title: 'Home', icon: Home }, { id: 'search' as View, title: 'Search', icon: Search }, { id: 'playlists' as View, title: 'Library', icon: Library }].map(({ id, title, icon: Icon }) => <button aria-current={view === id || (id === 'playlists' && ['liked','artists','history','playlist'].includes(view)) ? 'page' : undefined} className={view === id || (id === 'playlists' && ['liked','artists','history','playlist'].includes(view)) ? 'current' : ''} key={id} onClick={() => navigate(id)}><Icon size={19} /><span>{title}</span></button>)}</nav>
     <PlayerBar onArtist={openArtist} onAdd={addTrack} openQueue={() => navigate('queue')} openPlayer={() => setExpandedPlayer(true)} />
     {expandedPlayer && <NowPlaying onArtist={track=>{setExpandedPlayer(false);openArtist(track);}} onAdd={addTrack} close={() => setExpandedPlayer(false)} />}
+    {voiceOpen&&<VoiceSearch close={()=>setVoiceOpen(false)} search={doSearch}/>}
     <UpdateNotice />
     {notice && <div className="toast" role="status">{notice}</div>}
     {playlistModal && <Modal title={playlistModal === 'add' ? 'Add to playlist' : playlistModal === 'rename' ? 'Rename playlist' : 'Create a playlist'} close={() => setPlaylistModal(null)}>{playlistModal === 'add' && <div className="playlist-choices">{library.playlists.map(p => <button key={p.id} onClick={() => { if (trackToAdd) update(old => ({ ...old, playlists: old.playlists.map(list => list.id === p.id ? { ...list, tracks: uniqueTracks([...list.tracks, trackToAdd]) } : list) })); setPlaylistModal(null); notify(`Added to ${p.name}`); }}><ListMusic size={19} />{p.name}<Plus size={16} /></button>)}</div>}<form onSubmit={createPlaylist}><label htmlFor="playlist-name">{playlistModal === 'add' ? 'Or create a new playlist' : 'Playlist name'}</label><input id="playlist-name" autoFocus required maxLength={120} value={playlistName} onChange={e => setPlaylistName(e.target.value)} placeholder="Playlist name" /><button className="primary modal-submit" disabled={!playlistName.trim()} type="submit">{playlistModal === 'rename' ? 'Save name' : 'Create playlist'}</button></form></Modal>}

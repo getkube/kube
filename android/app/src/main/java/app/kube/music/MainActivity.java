@@ -10,6 +10,7 @@ import androidx.core.graphics.Insets;
 public class MainActivity extends BridgeActivity {
     @Override public void onCreate(Bundle savedInstanceState) {
         registerPlugin(KubePlayerPlugin.class);
+        registerPlugin(KubeVoicePlugin.class);
         registerPlugin(KubeUpdaterPlugin.class);
         super.onCreate(savedInstanceState);
         View content = findViewById(android.R.id.content);
