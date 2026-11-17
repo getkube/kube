@@ -33,7 +33,7 @@ export function TrackRow({ track, list, index, reason, onArtist, onAdd, onRadio 
 }
 export function Modal({ title, children, close }: { title: string; children: ReactNode; close: () => void }) {
   // Native dialog provides focus containment, Escape handling, and a modal accessibility tree.
-  return <dialog ref={node => { if (node && !node.open) node.showModal(); }} onCancel={close} onClick={e => { if (e.target === e.currentTarget) close(); }}><div className="modal-heading"><h2>{title}</h2><IconButton label="Close dialog" onClick={close}><X /></IconButton></div>{children}</dialog>;
+  return <dialog aria-label={title} ref={node => { if (node && !node.open) node.showModal(); }} onCancel={close} onClick={e => { if (e.target === e.currentTarget) close(); }}><div className="modal-heading"><h2>{title}</h2><IconButton label="Close dialog" onClick={close}><X /></IconButton></div>{children}</dialog>;
 }
 export function PlayerBar({ openQueue, openPlayer, onAdd, onArtist }: { onArtist:(track:Track)=>void; onAdd:(track:Track)=>void; openQueue: () => void; openPlayer: () => void }) {
   const { player, library, update, like, hide } = useApp(); const state = useSyncExternalStore(player.subscribe, player.snapshot); const track = player.current();

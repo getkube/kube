@@ -1,3 +1,4 @@
+import Strands from './components/Strands';
 import { AccountPreferences } from './AccountPreferences';
 import { useState, useSyncExternalStore, type FormEvent } from "react";
 import {
@@ -68,7 +69,7 @@ export function AccountPage({ back,openSettings }: { back: () => void;openSettin
         <ArrowLeft size={17} /> Back to music
       </button>
       <div className="account-layout">
-        <div className="account-intro">
+        <div className="account-intro"><div className="account-strands" aria-hidden="true"><Strands colors={['#ff5f72','#ff886c','#ffbc88','#fff0df','#ffadca','#bf6c94','#69395e']} interactive={false} clickPulse={false} speed={0.45} energy={0.45} maxDevicePixelRatio={1.25}/></div>
           <img src="./logo.png" alt="Kube" />
           <h1>
             Your music.

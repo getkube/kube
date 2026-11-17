@@ -1,4 +1,15 @@
 import { test, expect } from '@playwright/test';
+test('desktop search, account, and window controls share one top row',async({page})=>{
+  await page.goto('/',{waitUntil:'domcontentloaded'});
+  await page.evaluate(()=>{const controls=document.createElement('div');controls.className='window-controls';controls.innerHTML='<button>−</button><button>□</button><button>×</button>';document.querySelector('.topbar')!.append(controls);});
+  for(const width of [1365,800,680]){
+    await page.setViewportSize({width,height:900});
+    const bounds=await Promise.all(['.search-box','.account-button','.window-controls'].map(selector=>page.locator(selector).boundingBox()));
+    const centers=bounds.map(box=>box!.y+box!.height/2);expect(Math.max(...centers)-Math.min(...centers)).toBeLessThan(2);
+    expect(bounds[2]!.x+bounds[2]!.width).toBe(width);expect(bounds[2]!.y).toBe(0);
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  }
+});
 test('compact player navigation and persistent playlist creation', async ({ page }) => {
   await page.setViewportSize({ width: 1365, height: 900 });
   await page.goto('/', { waitUntil: 'domcontentloaded' });

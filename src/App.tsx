@@ -35,8 +35,8 @@ export function App() {
   const [artist, setArtist] = useState<Artist>(); const [playlistId, setPlaylistId] = useState('');
   const [playlistModal, setPlaylistModal] = useState<'create' | 'add' | 'rename' | null>(null); const [trackToAdd, setTrackToAdd] = useState<Track>(); const [playlistName, setPlaylistName] = useState('');
   const [importModal, setImportModal] = useState(false); const [importValue, setImportValue] = useState(''); const [importBusy, setImportBusy] = useState(false); const [importError, setImportError] = useState('');
-  const [visibleTracks,setVisibleTracks]=useState(24);
-  useEffect(()=>setVisibleTracks(24),[view,query,artist?.authorId,playlistId]);
+  const [visibleTracks,setVisibleTracks]=useState(12);
+  useEffect(()=>setVisibleTracks(12),[view,query,artist?.authorId,playlistId]);
   const [deleteId, setDeleteId] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
   useEffect(() => { if (view === 'search') searchRef.current?.focus(); }, [view]);
@@ -114,7 +114,7 @@ export function App() {
     } catch (e) { setImportError((e as Error).message); } finally { setImportBusy(false); }
   }
   function rows(tracks: Track[], reasons = false, removable = false) {
-    return <><div className="track-list">{tracks.slice(0,visibleTracks).map((track, index) => <div key={`${track.videoId}-${index}`} className={removable ? 'removable-row' : ''}><TrackRow track={track} list={tracks} index={index} reason={reasons ? recs.find(r => r.track.videoId === track.videoId)?.reason : undefined} onArtist={openArtist} onAdd={addTrack} onRadio={t => void radio(t)} />{removable && <IconButton label={`Remove ${track.title} from playlist`} onClick={() => update(old => ({ ...old, playlists: old.playlists.map(p => p.id === playlistId ? { ...p, tracks: p.tracks.filter(t => t.videoId !== track.videoId) } : p) }))}><X size={16} /></IconButton>}</div>)}</div><div className="track-pagination">{visibleTracks<tracks.length&&<button onClick={()=>setVisibleTracks(n=>n+24)}>Show more</button>}{visibleTracks>24&&<button onClick={()=>{setVisibleTracks(24);mainRef.current?.scrollTo({top:0});}}>Show less</button>}</div></>;
+    return <><div className="track-list">{tracks.slice(0,visibleTracks).map((track, index) => <div key={`${track.videoId}-${index}`} className={removable ? 'removable-row' : ''}><TrackRow track={track} list={tracks} index={index} reason={reasons ? recs.find(r => r.track.videoId === track.videoId)?.reason : undefined} onArtist={openArtist} onAdd={addTrack} onRadio={t => void radio(t)} />{removable && <IconButton label={`Remove ${track.title} from playlist`} onClick={() => update(old => ({ ...old, playlists: old.playlists.map(p => p.id === playlistId ? { ...p, tracks: p.tracks.filter(t => t.videoId !== track.videoId) } : p) }))}><X size={16} /></IconButton>}</div>)}</div><div className="track-pagination">{visibleTracks<tracks.length&&<button onClick={()=>setVisibleTracks(n=>n+12)}>Show more</button>}{visibleTracks>12&&<button onClick={()=>{setVisibleTracks(12);mainRef.current?.scrollTo({top:0});}}>Show less</button>}</div></>;
   }
   const nav = [{ id: 'home', title: 'Listen now', icon: Home }, { id: 'search', title: 'Explore', icon: Search }, { id: 'liked', title: 'Liked songs', icon: Heart }, { id: 'playlists', title: 'Playlists', icon: Library }, { id: 'artists', title: 'Artists', icon: Users }, { id: 'history', title: 'Recently played', icon: Clock3 }] as const;
   const titles: Partial<Record<View, [string, string]>> = { search: [query ? `Results for “${query}”` : 'Search', 'Search for a song or artist.'], liked: ['Liked songs', `${library.liked.length} liked tracks.`], history: ['Recently played', 'Your listening history.'], artists: ['Your artists', 'Artists you follow.'], playlists: ['Your playlists', 'Saved on this device.'], queue: ['Up next', `${playback.queue.length} tracks in your listening session.`] };

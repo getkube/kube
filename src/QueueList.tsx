@@ -7,7 +7,7 @@ import {Cover,IconButton} from './components';
 export function QueueList({onAdd}:{onAdd:(track:Track)=>void}) {
   const {player}=useApp();const state=useSyncExternalStore(player.subscribe,player.snapshot);
   const [menu,setMenu]=useState<number|null>(null);
-  const [visible,setVisible]=useState(24);
+  const [visible,setVisible]=useState(12);
   const root=useRef<HTMLDivElement>(null);
   const drag=useRef<{from:number;to:number;y:number;start:number;active:boolean;scroll:HTMLElement;frame:number}|null>(null);
   const [marker,setMarker]=useState<number|null>(null),[announcement,announce]=useState('');
@@ -36,5 +36,5 @@ export function QueueList({onAdd}:{onAdd:(track:Track)=>void}) {
     <button className="queue-song" aria-label={`Play queue song ${index+1}: ${track.title}`} aria-current={index===state.index?'true':undefined} onClick={()=>void player.play(track,state.queue)}><Cover track={track}/><span><strong>{track.title}</strong><small>{track.author}</small></span>{index===state.index&&<small className="queue-now">Now playing</small>}</button>
     <div className="menu-wrap"><IconButton label={`Options for queued ${track.title}`} onClick={()=>setMenu(menu===index?null:index)}><MoreHorizontal size={19}/></IconButton>{menu===index&&<><button className="menu-dismiss" aria-label="Close queue options" onClick={()=>setMenu(null)}/><div className="track-menu" role="menu"><button role="menuitem" onClick={()=>{setMenu(null);onAdd(track);}}>Add to playlist</button></div></>}</div>
     <IconButton label={`Remove queue song ${index+1}`} disabled={index===state.index} onClick={()=>player.remove(index)}><X size={17}/></IconButton>
-  </div>)}<div className="track-pagination">{visible<state.queue.length&&<button onClick={()=>setVisible(n=>n+24)}>Show more</button>}{visible>24&&<button onClick={()=>setVisible(24)}>Show less</button>}</div></div>;
+  </div>)}<div className="track-pagination">{visible<state.queue.length&&<button onClick={()=>setVisible(n=>n+12)}>Show more</button>}{visible>12&&<button onClick={()=>setVisible(12)}>Show less</button>}</div></div>;
 }
