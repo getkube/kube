@@ -29,10 +29,9 @@ for (const [type, size] of [['icp4',16],['icp5',32],['icp6',64],['ic07',128],['i
 }
 const icnsHeader = Buffer.alloc(8); icnsHeader.write('icns'); icnsHeader.writeUInt32BE(8 + icns.reduce((sum, item) => sum + item.length, 0), 4);
 await writeFile('build/icons/icon.icns', Buffer.concat([icnsHeader, ...icns]));
-// Extract the existing emblem from its white background for adaptive/themed icons.
-const { data, info } = await sharp(icon).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-for (let i = 0; i < data.length; i += 4) { const white = Math.min(data[i], data[i + 1], data[i + 2]); if (white > 245) data[i + 3] = 0; }
-const emblem = await sharp(data, { raw: info }).trim().png().toBuffer();
+// The source is already transparent. Re-extracting/trimming its raw pixels
+// clipped the emblem's rounded top and bottom in adaptive and splash icons.
+const emblem = icon;
 const res = 'android/app/src/main/res';
 await mkdir(`${res}/drawable-nodpi`, { recursive: true });
 await writeFile(`${res}/drawable-nodpi/kube_logo.png`, await png(androidIcon, 384));
